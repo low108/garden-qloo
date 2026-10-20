@@ -6,6 +6,10 @@ Qloo's taste graph, and you meet the one it would run away with.
 - **Live demo:** https://garden-qloo.vercel.app (try it: about a minute)
 - **Why simulate:** on 4,089 real speed dates, Qloo taste overlap predicted mutual matches no better than chance
   (AUC 0.48); see `/experiment` and `scripts/qloo_benchmark.py`.
+- **Why Qloo inside the simulation:** the same 60 real women dated in the Garden with and without Qloo grounding
+  (real venues + common ground). Only the Qloo-grounded twins' after-date feelings picked out real matches better
+  than chance (AUC 0.56, p ≈ 0.01; plain 0.51). The head-to-head gap is suggestive, not yet conclusive (p ≈ 0.07).
+  See `scripts/qloo_sim_experiment.py`.
 
 ## How Qloo powers it
 
