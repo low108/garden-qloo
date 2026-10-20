@@ -47,3 +47,4 @@ data/qloo_*.json
 # Vercel project link
 web/.vercel
 .vercel
+data/qloo_sim/
