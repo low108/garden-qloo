@@ -100,7 +100,7 @@ function toEntity(e: RawEntity, fallbackType?: EntityType): Entity {
       .filter((t) => t.name && !/^urn/.test(t.name) && !/not_for_display|amenit|payment|accessib|age_range|service|offering|menu|planning|dining_option|beverage|dietary|customer|crowd|popular_time|price/.test(t.type ?? ""))
       .slice(0, 6)
       .map((t) => t.name!),
-    kinds: tags.filter((t) => KIND_TAGS.test(t.type ?? "") && t.name).map((t) => t.name!),
+    kinds: [...new Set(tags.filter((t) => KIND_TAGS.test(t.type ?? "") && t.name).map((t) => t.name!))],
     flags: tags.filter((t) => FLAG_TAGS.test(`${t.type ?? ""}:${t.name ?? ""}`)).map((t) => t.name ?? ""),
     menu: tags.filter((t) => /menu_highlight/.test(t.type ?? "") && t.name).map((t) => t.name!).slice(0, 5),
   };

@@ -84,7 +84,7 @@ export async function rehearse(a: Person, b: Person, place: Candidate | null, ru
       .slice(0, 10),
     aAfter: clamp(r.aAfter),
     bAfter: clamp(r.bAfter),
-    spark: typeof r.spark === "string" ? r.spark.trim() : "",
+    spark: typeof r.spark === "string" ? r.spark.trim().replace(/^["“”'‘’\s]+|["“”'‘’\s]+$/g, "") : "",
     landed: strings(r.landed, 3),
     flat: strings(r.flat, 3),
     order: strings(r.order, 3).filter((o) => place?.menu.some((m) => m.toLowerCase() === o.toLowerCase())),
