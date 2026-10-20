@@ -26,8 +26,8 @@ export default function Home() {
           </li>
           <li>
             <b>Qloo finds the day.</b> For brunch, an afternoon, dinner and drinks, Qloo&apos;s insights find real places in your city
-            that <i>both</i> tastes point to, filtered by Qloo&apos;s halal and vegetarian tags and price level, and ranked by fit: quiet
-            places for introverts, something to do side by side for nervous daters, no bars if one of you doesn&apos;t drink.
+            that <i>both</i> tastes point to, in Qloo&apos;s own order, keeping only places you can both go to: Qloo&apos;s halal and vegetarian tags, its price level
+            against your budget, and no bars if one of you doesn&apos;t drink. Nothing is ranked by us: the rehearsals decide.
           </li>
           <li>
             <b>The twins rehearse it, and you watch.</b> Like Smallville, each rehearsal plays as a little pixel scene drawn from the

@@ -12,8 +12,8 @@ Qloo-tagged halal), and the minute it happened.
 | Step | Qloo |
 |---|---|
 | Two real tastes | `/search`: you (and your match) pick real films, artists, shows and books; each twin loves those entities |
-| The day's candidates | `/v2/insights` with `filter.type=urn:entity:place`, both people's entities as the signal, `filter.location.query`=your city, and `filter.tags` per slot (cafe/brunch/bakery, museum/gallery/park, restaurant, cocktail/wine bar) |
-| Fit to the two people | Qloo's typed tags: `dietary_option` (halal, vegetarian, vegan) via `operator.filter.tags=intersection`, `price_level` against the budget, `noise_level`/`ambience` against introvert/extravert, place kinds for side-by-side dates; bars swapped for dessert/tea/night markets if one doesn't drink |
+| The day's candidates | `/v2/insights` with `filter.type=urn:entity:place`, both people's entities as the signal, `filter.location.query`=your city, and `filter.tags` per slot (cafe/brunch/bakery, museum/gallery/park, restaurant, cocktail/wine bar); Qloo's top 5 per slot are all rehearsed, in Qloo's order, with no ranking of ours |
+| Can both go | Qloo's typed tags: `dietary_option` (halal, vegetarian, vegan) via `operator.filter.tags=intersection`, `price_level` against the budget, bars swapped for dessert/tea/night markets if one doesn't drink |
 | The scene | each rehearsal plays as a pixel-art scene (canvas, no engine) whose setting and props come from the place's Qloo kinds and tags; the twins act out each line, and a proof moment lights up the Qloo tag it cites |
 | Proof | each place's Qloo features are numbered (F1…); every moment the twins report must cite a real line, a real profile item and a real feature, or it is dropped |
 | What to order | each place's `menu_highlight` tags: the twins may only order those |

@@ -16,7 +16,7 @@ const SLOTS: { slot: Slot; time: string; label: string; icon: string }[] = [
   { slot: "dinner", time: "18:30", label: "Dinner", icon: "🍽️" },
   { slot: "drinks", time: "21:00", label: "After dinner", icon: "🌙" },
 ];
-const PARALLEL = 5; // rehearsals in flight at once
+const PARALLEL = 8; // rehearsals in flight at once
 const TYPES: { type: EntityType; label: string; hint: string }[] = [
   { type: "movie", label: "Films", hint: "e.g. Spirited Away" },
   { type: "artist", label: "Music", hint: "e.g. Norah Jones" },
@@ -421,9 +421,9 @@ export default function Plan() {
                 {city} that people with <i>both</i> tastes tend to love, one query per slot (café/brunch, park/museum/gallery,
                 restaurant, bar or dessert).</li>
               <li><b>Your needs become filters.</b> Halal or vegetarian is sent as Qloo&apos;s <code>dietary_option</code> tag with an
-                intersection filter, the budget is checked against Qloo&apos;s <code>price_level</code>, and the places are ranked
-                against your answers using Qloo&apos;s noise, ambience and kind tags (quiet for introverts, something to do side by side for
-                nervous daters).</li>
+                intersection filter, the budget is checked against Qloo&apos;s <code>price_level</code>, and bars are swapped for dessert or tea if one of you
+                doesn&apos;t drink. These rules only remove places; nothing is ranked by us. Qloo&apos;s top five per slot are all
+                rehearsed, in Qloo&apos;s order.</li>
               <li><b>Qloo&apos;s tags become the world.</b> Each place&apos;s Qloo tags (kinds, ambience, cuisine, menu highlights) are
                 numbered F1, F2… and handed to the twins as everything they know about it. The scene is drawn from them too: a park, a
                 bar with a stage for live music, lanterns for Japanese food.</li>

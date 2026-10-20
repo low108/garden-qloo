@@ -39,17 +39,9 @@ where something about one of you (an introvert, a Spirited Away fan, halal only)
    `operator.filter.tags=intersection`, so a place must be, say, a café and halal. Then we drop places above the lower of the two
    budgets (Qloo `price_level`), bars if either doesn't drink, places that aren't for dates (hotels, places of worship, schools,
    shops, offices) and, for meals, street addresses and whole neighbourhoods.
-4. **Fit to the two people ranks the rest**, from each place's Qloo tags:
-   - an introvert: +1 if quiet (cosy, calm, intimate…), −1.5 if loud (lively, bustling, nightlife…);
-   - an extravert: +1 if lively;
-   - nervous, or prefers doing something: +1 if there is something to do side by side (museum, gallery, park, market, live
-     music…);
-   - loves trying new things: +0.7 if unusual (quirky, themed, hidden gem…); prefers the familiar: −0.5;
-   - +0.4 for each place tag that echoes a favourite (a "Japanese" garden for a Spirited Away fan);
-   - +0.5 for a meal place with Qloo menu highlights, so the twins have real dishes to order.
-
-   Ties keep Qloo's own order. The top two per slot go forward, and no place is used twice in the day.
-5. **Rehearse and compare:** the twins go on the date once at each of these (up to eight) places and once at a plain café with no Qloo
+4. **No ranking of ours:** Qloo's top five that survive the rules, in Qloo's order, go forward for each slot, and no place is
+   used twice in the day. We don't score places against the profiles in code; that is what the rehearsals are for.
+5. **Rehearse and compare:** the twins go on the date once at each of these (up to 20) places and once at a plain café with no Qloo
    data. For each slot, the plan takes the place where both twins' wish for a second date (0–100, averaged) rose most above the
    café.
 
@@ -60,8 +52,6 @@ where something about one of you (an introvert, a Spirited Away fan, halal only)
 - **Hard needs as Qloo filters:** halal, vegetarian and vegan go in as Qloo `dietary_option` tags with
   `operator.filter.tags=intersection`; the budget is checked against Qloo's `price_level`; bars are swapped for dessert, tea
   houses and night markets if either person doesn't drink.
-- **Personality fit from Qloo tags:** noise, ambience and kind tags rank the places (quiet for introverts, lively for
-  extraverts, something to do side by side for nervous daters).
 - **Qloo tags are the twins' world:** each place's tags and menu highlights are numbered (F1, F2…) and are everything the twins
   know; they may only order from the menu tags. The pixel scene is drawn from the same tags.
 - **Checked reasons:** every moment the twins report must cite a real line, a real profile item and a real Qloo tag, or it is

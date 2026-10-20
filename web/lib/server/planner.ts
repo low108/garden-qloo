@@ -1,6 +1,6 @@
 // Rehearse your first date: for a couple who already matched, Qloo finds places for a whole day that both
-// tastes point to and that fit both people (food needs, alcohol, budget as hard rules; energy, nerves, date
-// style and appetite for novelty as preferences). The twins rehearse each place once, and every rehearsal has
+// tastes point to and that both people can go to (food needs, alcohol and budget are hard rules). Nothing is
+// ranked in code: the twins rehearse every place Qloo recommends, once each, and every rehearsal has
 // to show its work: moments where a specific line ties something about one of them to something real about
 // the place. The server checks each moment against the profiles and the place's Qloo tags before showing it.
 import "server-only";
@@ -23,7 +23,9 @@ export const SLOTS: { slot: Slot; time: string; label: string; tags: string[]; f
 const DIET_TAG: Partial<Record<Prefs["diet"][number], string>> = {
   halal: T("dietary_option:qloo:halal"), vegetarian: T("dietary_option:qloo:vegetarian"), vegan: T("dietary_option:qloo:vegan"),
 };
-const PER_SLOT = 2;
+// How many of Qloo's recommendations per slot get rehearsed, in Qloo's order. Every one is rehearsed; this only
+// caps the day's model calls and wait (4 slots x 5 + the cafe = 21 rehearsals).
+export const PLACES_PER_SLOT = 5;
 // Not first-date places: hotels, places of worship, youth and community centres, shops, corporate clubs.
 const NOT_A_DATE = /hotel|resort|temple|church|mosque|dargah|shrine|cathedral|school|kids|child|youth|community|hospital|store\b|club ?house|members|corporate|office|canteen|cafeteria|food court|supermarket|coworking/i;
 // A street address or a whole neighbourhood rather than one place you can book ("10 Winstedt Road", "Dempsey Hill").
@@ -44,36 +46,33 @@ const GENERIC = new Set(["restaurant", "place", "urban", "food", "delivery", "ta
   "drinks", "service", "friendly", "popular", "good", "great", "modern", "local", "city", "area", "street", "style", "options"]);
 const words = (s: string) => s.toLowerCase().split(/[^a-z\u00c0-\u024f]+/).filter((w) => w.length > 3 && !GENERIC.has(w));
 
-/** How well a place fits two people, and the reasons, from its Qloo tags. */
-function fit(place: Entity, people: Person[]): { score: number; fits: string[]; links: string[] } {
+/** What a place's Qloo tags say about it for these two people, shown on its card. Descriptive only: it ranks nothing. */
+function fit(place: Entity, people: Person[]): { fits: string[]; links: string[] } {
   const v = [...place.vibe, ...place.kinds].join(" · ");
   const what = place.kinds.join(" · "); // what the place is, not every word said about it
   const quiet = QUIET.test(v) && !LOUD.test(v), loud = LOUD.test(v) && !QUIET.test(v);
-  let score = 0;
   const fits: string[] = [];
   for (const p of people) {
     const x = p.prefs;
-    if (x.energy === "introvert" && quiet) { score += 1; fits.push(`calm and quiet, good for ${p.name} (introvert)`); }
-    if (x.energy === "introvert" && loud) score -= 1.5;
-    if (x.energy === "extravert" && loud) { score += 1; fits.push(`lively, good for ${p.name} (extravert)`); }
-    if ((x.nerves !== "calm" || x.style === "do") && SIDE_BY_SIDE.test(what)) { score += 1; fits.push(`something to do side by side, good for ${p.name}`); }
-    if (x.novelty === "surprise" && NOVEL.test(v)) { score += 0.7; fits.push(`something new for ${p.name}`); }
-    if (x.novelty === "familiar" && NOVEL.test(v)) score -= 0.5;
+    if (x.energy === "introvert" && quiet) fits.push(`calm and quiet, good for ${p.name} (introvert)`);
+    if (x.energy === "introvert" && loud) fits.push(`lively: may tire ${p.name} (introvert)`);
+    if (x.energy === "extravert" && loud) fits.push(`lively, good for ${p.name} (extravert)`);
+    if ((x.nerves !== "calm" || x.style === "do") && SIDE_BY_SIDE.test(what)) fits.push(`something to do side by side, good for ${p.name}`);
+    if (x.novelty === "surprise" && NOVEL.test(v)) fits.push(`something new for ${p.name}`);
   }
   // Echoes of their favourites in the place: tag words that also appear in a favourite's name or Qloo tags.
   const theirs = new Set(people.flatMap((p) => p.favourites.flatMap((f) => [f.name, ...f.tags].flatMap(words))));
   const links = place.vibe.filter((t) => words(t).some((w) => theirs.has(w))).slice(0, 4);
-  score += 0.4 * links.length;
   // "quiet, good for Mira" + "quiet, good for Luca" reads as "quiet, good for Mira and Luca".
   const merged = new Map<string, string[]>();
   for (const f of fits) {
     const [what, who = ""] = f.split(", good for ");
     merged.set(what, [...(merged.get(what) ?? []), who].filter(Boolean));
   }
-  return { score, fits: [...merged].map(([what, who]) => (who.length ? `${what}, good for ${[...new Set(who)].join(" and ")}` : what)), links };
+  return { fits: [...merged].map(([what, who]) => (who.length ? `${what}, good for ${[...new Set(who)].join(" and ")}` : what)), links };
 }
 
-/** Two places per slot that both tastes point to and both people can enjoy, no place used twice in the day. */
+/** Qloo's top places per slot for both tastes, minus the ones these two can't go to, in Qloo's order. */
 export async function candidates(a: Person, b: Person, city: string): Promise<Candidate[]> {
   const ids = [...a.favourites, ...b.favourites].map((e) => e.id);
   const diet = [...new Set([...a.prefs.diet, ...b.prefs.diet])];
@@ -87,19 +86,21 @@ export async function candidates(a: Person, b: Person, city: string): Promise<Ca
     const food = s.food || (s.slot === "drinks" && sober);
     // Food needs are hard rules: each category is asked for together with every diet tag (a cafe AND halal).
     const lists = food && dietTags.length
-      ? await Promise.all(tags.map((t) => placesFor(ids, city, [t, ...dietTags], 10, true)))
+      ? await Promise.all(tags.map((t) => placesFor(ids, city, [t, ...dietTags], 25, true)))
       : [await placesFor(ids, city, tags, 25)];
+    // Several lists (one per category) are taken in turn, so each keeps Qloo's own order.
     const seen = new Set<string>();
-    const pool = lists.flat().filter((p) => !seen.has(p.id) && !!seen.add(p.id));
+    const pool = Array.from({ length: Math.max(...lists.map((l) => l.length), 0) }, (_, i) => lists.map((l) => l[i]))
+      .flat()
+      .filter((p): p is Entity => !!p && !seen.has(p.id) && !!seen.add(p.id));
+    // Hard rules only: places these two can't or wouldn't go to on a date. Everything else is left to the rehearsals.
     const ok = pool
-      .map((p, rank) => ({ p, rank, f: fit(p, [a, b]) }))
-      .filter(({ p }) => !used.has(p.id) && !p.flags.length && !NOT_A_DATE.test([p.name, ...p.kinds].join(" ")))
-      .filter(({ p }) => !(food && AREA.test(p.name.trim())))
-      .filter(({ p }) => !p.price || p.price <= budget)
-      .filter(({ p }) => !(sober && /bar$|pub|cocktail|wine|brewery/i.test(p.kinds.join(" "))))
-      // For a meal, a place with Qloo menu highlights gives the twins something real to order.
-      .sort((x, y) => y.f.score + (food && y.p.menu.length ? 0.5 : 0) - x.f.score - (food && x.p.menu.length ? 0.5 : 0) || x.rank - y.rank);
-    for (const { p, f } of ok.slice(0, PER_SLOT)) {
+      .filter((p) => !used.has(p.id) && !p.flags.length && !NOT_A_DATE.test([p.name, ...p.kinds].join(" ")))
+      .filter((p) => !(food && AREA.test(p.name.trim())))
+      .filter((p) => !p.price || p.price <= budget)
+      .filter((p) => !(sober && /bar$|pub|cocktail|wine|brewery/i.test(p.kinds.join(" "))));
+    for (const p of ok.slice(0, PLACES_PER_SLOT)) {
+      const f = fit(p, [a, b]);
       used.add(p.id);
       const rules = [
         ...(food ? diet.map((d) => (DIET_TAG[d] ? `Qloo tags it ${DIETS[d].toLowerCase()}: confirm before booking` : `${DIETS[d].toLowerCase()}: check the menu`)) : []),
