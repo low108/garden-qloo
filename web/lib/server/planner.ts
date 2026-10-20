@@ -26,7 +26,7 @@ const NOT_A_DATE = /hotel|resort|temple|church|mosque|dargah|shrine|cathedral|sc
 // A street address or a whole neighbourhood rather than one place you can book ("10 Winstedt Road", "Dempsey Hill").
 const AREA = /^\d+[a-z]? [\w ]+ (road|rd|street|st|avenue|ave|lane)$|^[\w ]+ (hill|village|quarter|district|precinct)$/i;
 const QUIET = /quiet|cozy|calm|tranquil|relax|peaceful|intimate|serene/i;
-const LOUD = /lively|loud|party|club|nightlife|energetic|bustling|crowded|vibrant/i;
+const LOUD = /lively|loud|party|club|nightlife|energetic|bustling|crowded|vibrant|noisy|busy|buzzing/i;
 const SIDE_BY_SIDE = /museum|gallery|park|garden|market|book|board game|arcade|live music|concert|walk|nature/i;
 const NOVEL = /unique|quirky|hidden gem|themed|innovative|creative|unusual|experimental|eclectic/i;
 
@@ -186,7 +186,13 @@ export async function rehearse(a: Person, b: Person, place: Candidate | null): P
       // A moment credited to a favourite must actually bring it up.
       const fav = /^loves (.+) \((film|music|TV show|book)\)$/.exec(because);
       if (fav && ![fav[1].toLowerCase(), ...words(fav[1])].some((w) => lines[line].say.toLowerCase().includes(w))) return null;
-      return { line, who, because, feature, effect: (Number(m.effect) < 0 ? -1 : 1) as 1 | -1 };
+      const effect = (Number(m.effect) < 0 ? -1 : 1) as 1 | -1;
+      // The direction must agree with the tag: an introvert isn't won over by "Bustling" or put off by "Quiet",
+      // and an extravert the other way round.
+      const quiet = QUIET.test(feature) && !LOUD.test(feature), loud = LOUD.test(feature) && !QUIET.test(feature);
+      if (/is an introvert/.test(because) && ((loud && effect > 0) || (quiet && effect < 0))) return null;
+      if (/is an extravert/.test(because) && ((quiet && effect > 0) || (loud && effect < 0))) return null;
+      return { line, who, because, feature, effect };
     })
     .filter((m): m is Moment => !!m)
     .slice(0, 6);
