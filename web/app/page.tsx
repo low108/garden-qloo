@@ -1,5 +1,5 @@
 import Link from "next/link";
-import "./try/try.css";
+import "./ui.css";
 
 export default function Home() {
   return (
@@ -41,9 +41,6 @@ export default function Home() {
       <section className="card">
         <h2>More</h2>
         <ul className="links">
-          <li>
-            <Link href="/replay">See a full 27-day simulation</Link>: a whole Garden of twins on a pixel map, with diaries and a breakout.
-          </li>
           <li>
             <a href="https://github.com/low108/garden-qloo">Source code</a> (MIT licence).
           </li>

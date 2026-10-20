@@ -5,7 +5,7 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import type { Person } from "@/lib/server/garden";
 import type { Candidate, Rehearsal, Slot } from "@/lib/server/planner";
 import type { Entity, EntityType } from "@/lib/server/qloo";
-import "../try/try.css";
+import "../ui.css";
 import "./plan.css";
 
 const SLOTS: { slot: Slot; time: string; label: string; icon: string }[] = [
@@ -218,7 +218,7 @@ export default function Plan() {
   return (
     <main className="try plan">
       <nav className="crumbs">
-        <Link href="/">The Garden</Link> · <Link href="/replay">See a full 27-day simulation</Link>
+        <Link href="/">The Garden</Link>
       </nav>
       <h1>Rehearse your first date</h1>
       <p className="lede">

@@ -10,10 +10,7 @@
     "export": "STATIC_EXPORT=1 next build"
   },
   "dependencies": {
-    "easystarjs": "^0.4.4",
-    "firebase": "^11.10.0",
     "next": "15.5.27",
-    "phaser": "^3.90.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "server-only": "^0.0.1"
