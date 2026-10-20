@@ -30,7 +30,9 @@ export default function Home() {
             places for introverts, something to do side by side for nervous daters, no bars if one of you doesn&apos;t drink.
           </li>
           <li>
-            <b>The twins rehearse it.</b> They go on the date once at every candidate place, and once at a plain café to compare. We
+            <b>The twins rehearse it, and you watch.</b> Like Smallville, each rehearsal plays as a little pixel scene drawn from the
+            place&apos;s Qloo tags (a park, a bar with a stage, lanterns for Japanese food): the twins walk in, sit, order, stroll and
+            talk in speech bubbles. They go on the date once at every candidate place, and once at a plain café to compare. We
             measure how much each wants a second date afterwards, and they mark the lines where something about one of them met
             something about the place.
           </li>

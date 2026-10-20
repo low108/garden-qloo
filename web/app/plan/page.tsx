@@ -7,6 +7,7 @@ import type { Candidate, Moment, Rehearsal, Slot } from "@/lib/server/planner";
 import type { Entity, EntityType } from "@/lib/server/qloo";
 import { BUDGETS, DEFAULT_PREFS, DIETS, type Prefs, QUESTIONS } from "@/lib/profile";
 import "../ui.css";
+import DateScene from "./DateScene";
 import "./plan.css";
 
 const SLOTS: { slot: Slot; time: string; label: string; icon: string }[] = [
@@ -412,6 +413,27 @@ export default function Plan() {
         <section className="card day" ref={planRef}>
           <h2>Your first date with {mname}</h2>
           <p className="meta">Each stop is the place where your twins&apos; wish for a second date rose most compared with the same two of you at a plain café, with the moments from the rehearsal that explain why.</p>
+          <details className="how-qloo">
+            <summary>How Qloo works in this simulation</summary>
+            <ol>
+              <li><b>Your tastes become a signal.</b> The films, music, shows and books you both picked are Qloo entities. Qloo&apos;s
+                <code>/v2/insights</code> takes both sets together as <code>signal.interests.entities</code> and returns real places in{" "}
+                {city} that people with <i>both</i> tastes tend to love, one query per slot (café/brunch, park/museum/gallery,
+                restaurant, bar or dessert).</li>
+              <li><b>Your needs become filters.</b> Halal or vegetarian is sent as Qloo&apos;s <code>dietary_option</code> tag with an
+                intersection filter, the budget is checked against Qloo&apos;s <code>price_level</code>, and the places are ranked
+                against your answers using Qloo&apos;s noise, ambience and kind tags (quiet for introverts, something to do side by side for
+                nervous daters).</li>
+              <li><b>Qloo&apos;s tags become the world.</b> Each place&apos;s Qloo tags (kinds, ambience, cuisine, menu highlights) are
+                numbered F1, F2… and handed to the twins as everything they know about it. The scene is drawn from them too: a park, a
+                bar with a stage for live music, lanterns for Japanese food.</li>
+              <li><b>The twins live it.</b> GLM-5.3 voices each twin from your profile only, at that place, for about 90 minutes. They may
+                only order dishes from Qloo&apos;s menu tags.</li>
+              <li><b>Every reason is checked.</b> When a line moves one of them, it must cite a profile item (A3: &quot;is an
+                introvert&quot;) and a Qloo feature (F2: &quot;Quiet&quot;). We drop any moment that cites something that isn&apos;t there.
+                The same two at a plain café, with no Qloo data, is the baseline each place is compared with.</li>
+            </ol>
+          </details>
           <ol className="timeline">
             {winners.filter((w) => w.best).map((w) => {
               const c = w.best!;
@@ -447,8 +469,9 @@ export default function Plan() {
                       </>
                     )}
                     {tryThis.length > 0 && <p className="try-this"><span>Try:</span> {tryThis.join(" · ")}</p>}
+                    {r && <DateScene key={c.id} r={r} names={names} place={c} start={w.time} />}
                     <button className="link" onClick={() => setOpen(open === w.slot ? null : w.slot)}>
-                      {open === w.slot ? "Hide the rehearsal" : "Read the whole rehearsal"}
+                      {open === w.slot ? "Hide the transcript" : "Read the transcript"}
                     </button>
                     {open === w.slot && r && <Transcript r={r} names={names} />}
                   </div>
@@ -502,6 +525,7 @@ export default function Plan() {
                       {row === c.id && r && (
                         <tr className="detail">
                           <td colSpan={6}>
+                            <DateScene r={r} names={names} place={c.id === "cafe" ? null : (c as Candidate)} start={slot?.time} />
                             <Transcript r={r} names={names} />
                           </td>
                         </tr>

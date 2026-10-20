@@ -115,7 +115,9 @@ const RULES =
   "first date: short lines, curiosity, opinions, a little awkwardness. React to the place: what it looks, sounds and feels like. Let it go " +
   "well or badly as these two would, given who they are. Never mention being an AI.";
 
-export type Line = { who: "a" | "b"; say: string; min: number };
+export const ACTS = ["arrive", "sit", "walk", "look", "order", "eat", "drink", "laugh", "leave"] as const;
+export type Act = (typeof ACTS)[number];
+export type Line = { who: "a" | "b"; say: string; min: number; act: Act }; // act: what they are doing, for the scene
 export type Moment = {
   line: number; // index into lines
   who: "a" | "b";
@@ -130,6 +132,7 @@ export type Rehearsal = {
   bAfter: number;
   moments: Moment[];
   order: string[];
+  features: string[]; // everything Qloo told the twins about the place, in the order the prompt numbered them (F1...)
 };
 
 const clamp = (n: unknown, lo = 0, hi = 100, d = 50) => Math.max(lo, Math.min(hi, Math.round(Number(n) || d)));
@@ -138,26 +141,32 @@ export async function rehearse(a: Person, b: Person, place: Candidate | null): P
   const slot = SLOTS.find((s) => s.slot === place?.slot);
   const aItems = profileItems(a), bItems = profileItems(b);
   const features = place
-    ? [...new Set([...place.kinds.filter((k) => k !== "Place"), ...place.vibe, ...place.menu.map((m) => `menu: ${m}`)])].slice(0, 30)
+    ? [...new Set([...[...place.kinds, ...place.vibe].filter((k) => k !== "Place"), ...place.menu.map((m) => `menu: ${m}`)])].slice(0, 30)
     : ["plain cafe", "nothing special", "coffee"];
   const list = (xs: string[], tag: string) => xs.map((x, i) => `[${tag}${i + 1}] ${x}`).join("\n");
   const where = place ? `${slot?.label ?? "A date"} at ${place.name}${place.address ? ` (${place.address})` : ""}.` : "Coffee at a plain, quiet cafe with nothing special about it.";
   const r = await json<Record<string, unknown>>(
     `${where}\n\nTWIN A: ${facts(a)}. Profile:\n${list(aItems, "A")}\n\nTWIN B: ${facts(b)}. Profile:\n${list(bItems, "B")}\n\n` +
       `THE PLACE, as Qloo describes it:\n${list(features, "F")}\n\n` +
-      "Write the date as 10 short alternating lines, A first, each with the minute into the date it is said (0-90). Then how much each " +
+      "Write the date as 10 short alternating lines, A first, each with the minute into the date it is said (0-90) and what " +
+      `they are doing then (one of: ${ACTS.join(", ")}). Then how much each ` +
       "now wants a second date, from 0 (not at all) to 100 (can't wait), using the whole scale honestly. Then the moments that moved " +
       "either of them: for each, the line number (1-10), whose feeling changed, the profile item that explains it (its id, like A3 or " +
       "B1), the place feature it met (its id, like F2), and whether it drew them closer (1) or pushed them apart (-1). Only list a " +
       "moment if that line really shows it. Finally, what they had there (menu features only).",
-    `{"lines": [{"who": "a" or "b", "say": "...", "min": 0-90}], "aAfter": 0-100, "bAfter": 0-100, ` +
+    `{"lines": [{"who": "a" or "b", "say": "...", "min": 0-90, "act": "sit"}], "aAfter": 0-100, "bAfter": 0-100, ` +
       `"moments": [{"line": 1-10, "who": "a" or "b", "because": "A3", "feature": "F2", "effect": 1 or -1}], "order": ["F7"]}`,
     ["lines", "aAfter", "bAfter"],
     RULES,
   );
   const lines: Line[] = (Array.isArray(r.lines) ? (r.lines as Record<string, unknown>[]) : [])
     .filter((l) => typeof l?.say === "string")
-    .map((l) => ({ who: (l.who === "b" ? "b" : "a") as "a" | "b", say: String(l.say).trim(), min: clamp(l.min, 0, 180, 0) }))
+    .map((l) => ({
+      who: (l.who === "b" ? "b" : "a") as "a" | "b",
+      say: String(l.say).trim(),
+      min: clamp(l.min, 0, 180, 0),
+      act: (ACTS as readonly string[]).includes(String(l.act)) ? (l.act as Act) : "sit",
+    }))
     .slice(0, 12);
   // Every moment must point at a real line, a real profile item of that twin, and a real feature of the place.
   const item = (id: unknown, who: "a" | "b") => {
@@ -183,5 +192,5 @@ export async function rehearse(a: Person, b: Person, place: Candidate | null): P
     .filter((m): m is Moment => !!m)
     .slice(0, 6);
   const order = (Array.isArray(r.order) ? r.order : []).map(feat).filter((f): f is string => !!f && f.startsWith("menu: ")).map((f) => f.slice(6));
-  return { venue: place?.id ?? null, lines, aAfter: clamp(r.aAfter), bAfter: clamp(r.bAfter), moments, order: [...new Set(order)].slice(0, 3) };
+  return { venue: place?.id ?? null, lines, aAfter: clamp(r.aAfter), bAfter: clamp(r.bAfter), moments, order: [...new Set(order)].slice(0, 3), features };
 }
