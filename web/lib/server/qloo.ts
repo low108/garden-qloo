@@ -139,14 +139,15 @@ export async function insights(
 }
 
 /** Places in a city that a set of entities (two people's favourites) points to, limited by tag IDs: any of them,
- *  or all of them when `all` (e.g. a cafe that is also halal). */
-export async function placesFor(entities: string[], city: string, tags: string[], take = 12, all = false): Promise<Entity[]> {
+ *  or all of them when `all` (e.g. a cafe that is also halal), and at most `priceMax` (Qloo's price level, 1-4). */
+export async function placesFor(entities: string[], city: string, tags: string[], take = 12, all = false, priceMax?: number): Promise<Entity[]> {
   const d = await get("/v2/insights", {
     "filter.type": "urn:entity:place",
     "signal.interests.entities": entities.join(","),
     "filter.location.query": city,
     "filter.tags": tags.join(","),
     ...(all ? { "operator.filter.tags": "intersection" } : {}),
+    ...(priceMax && priceMax < 4 ? { "filter.price_level.max": priceMax } : {}),
     take,
   });
   const ents = d.results && !Array.isArray(d.results) ? (d.results.entities ?? []) : [];

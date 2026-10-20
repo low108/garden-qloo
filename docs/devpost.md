@@ -19,41 +19,34 @@ know either of you.
 
 ## What it does
 You and your match each pick favourite films, music, shows and books (real Qloo entities) and answer seven quick questions:
-social energy, first-date nerves, talk or do, new or familiar, food needs, alcohol and budget. Qloo finds real places in your
-city for brunch, an afternoon, dinner and after dinner that both tastes point to. Your AI twins then rehearse the date at each
-place, and once at a plain café for comparison, and you watch it as a Smallville-style pixel scene: they walk in, order,
-stroll and talk in speech bubbles.
+social energy, first-date nerves, talk or do, new or familiar, food needs, alcohol and budget. Qloo picks the restaurants in
+your city that both tastes point to. Your AI twins then have dinner at every one of them at once, plus a plain café for
+comparison, and you can watch each dinner live as a little room in the style of PewDiePie's Tuber Simulator: themed decor
+from the restaurant's Qloo tags, the twins at a table ordering from the real menu tags, speech bubbles and heart meters.
 
-You get the day that raised both twins' wish for a second date most, and the proof for every stop: the quoted line and minute
+You get the top three restaurants by how much affection rose over the café, and the proof for each: the quoted line and minute
 where something about one of you (an introvert, a Spirited Away fan, halal only) met something Qloo knows about the place
-(Quiet, Japanese, halal-tagged). Plus what to order from the real menu and what to watch out for.
+(Cozy, Japanese, halal-tagged). Click any moment to watch it play.
 
-## How it chooses where to rehearse
-1. **Four slots, each with Qloo place categories:** brunch (café, brunch, bakery), afternoon (museum, art gallery, park,
-   bookshop, board-game café), dinner (restaurant) and after dinner (cocktail bar, wine bar, bar, live music; or dessert, tea
-   house, night market and live music if either person doesn't drink).
-2. **Both tastes as one signal:** for each slot, `/v2/insights` gets every favourite of both people as
-   `signal.interests.entities`, the city as `filter.location.query` and the slot's categories as `filter.tags`. Qloo returns
-   places people with both tastes tend to love, in order of affinity (up to 25 per slot).
-3. **Hard rules remove places:** for meals, each diet need is sent as a Qloo `dietary_option` tag with
-   `operator.filter.tags=intersection`, so a place must be, say, a café and halal. Then we drop places above the lower of the two
-   budgets (Qloo `price_level`), bars if either doesn't drink, places that aren't for dates (hotels, places of worship, schools,
-   shops, offices) and, for meals, street addresses and whole neighbourhoods.
-4. **No ranking of ours:** Qloo's top five that survive the rules, in Qloo's order, go forward for each slot, and no place is
-   used twice in the day. We don't score places against the profiles in code; that is what the rehearsals are for.
-5. **Rehearse and compare:** the twins go on the date once at each of these (up to 20) places and once at a plain café with no Qloo
-   data. For each slot, the plan takes the place where both twins' wish for a second date (0–100, averaged) rose most above the
-   café.
+## How it chooses the restaurants
+1. **Both tastes as one signal:** `/v2/insights` gets every favourite of both people as `signal.interests.entities`, the city
+   as `filter.location.query` and `urn:tag:category:place:restaurant` as `filter.tags`.
+2. **Hard needs as Qloo filters:** the lower of the two budgets goes in as `filter.price_level.max`; each diet need goes in as a
+   Qloo `dietary_option` tag with `operator.filter.tags=intersection`, so a restaurant must also be, say, halal.
+3. **A few rules remove non-date places:** hotels, places of worship, schools, shops, offices, members' clubs, street
+   addresses and whole neighbourhoods, and bars if either person doesn't drink.
+4. **No ranking of ours:** Qloo's top ten that remain, in Qloo's order, are all rehearsed.
+5. **The rehearsals rank them:** each twin says how much they want a second date (0-100) after dinner; the top three are the
+   restaurants where the average rose most above the plain café.
 
 ## How we use Qloo
 - **Search:** every favourite is a Qloo entity, resolved with `/search`.
 - **Insights as the planner:** `/v2/insights` with both people's entities as `signal.interests.entities`, the city as
-  `filter.location.query`, and a slot's place categories as `filter.tags`: places people with *both* tastes love.
+  `filter.location.query`, and restaurants as `filter.tags`: places people with *both* tastes love.
 - **Hard needs as Qloo filters:** halal, vegetarian and vegan go in as Qloo `dietary_option` tags with
-  `operator.filter.tags=intersection`; the budget is checked against Qloo's `price_level`; bars are swapped for dessert, tea
-  houses and night markets if either person doesn't drink.
+  `operator.filter.tags=intersection`; the budget goes in as `filter.price_level.max`.
 - **Qloo tags are the twins' world:** each place's tags and menu highlights are numbered (F1, F2…) and are everything the twins
-  know; they may only order from the menu tags. The pixel scene is drawn from the same tags.
+  know; they may only order from the menu tags. Each room's decor is drawn from the same tags.
 - **Checked reasons:** every moment the twins report must cite a real line, a real profile item and a real Qloo tag, or it is
   dropped. The plain café with no Qloo data is the baseline, so each place's score is what Qloo's choice added.
 

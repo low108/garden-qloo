@@ -5,14 +5,14 @@ export default function Home() {
   return (
     <main className="try home">
       <p className="crumbs">The Garden · Qloo Agentic Hackathon</p>
-      <h1>Rehearse your first date before you go.</h1>
+      <h1>Rehearse your first dinner before you go.</h1>
       <p className="lede">
-        You matched. Now what? Your AI twins try out a whole day together, at real places Qloo&apos;s taste graph picks for both of you.
-        You get the day that brought them closest, and the moments from the rehearsal that prove why each place works for you two.
+        You matched. Now where do you eat? Qloo picks the restaurants you would both love, your AI twins have dinner at every one of
+        them, and you get the three where they fell for each other most, with the exact moments that prove why.
       </p>
       <p>
         <Link className="go" href="/plan">
-          Plan our day (about a minute) →
+          Rehearse our dinner (under a minute) →
         </Link>
       </p>
 
@@ -25,21 +25,20 @@ export default function Home() {
             match (or pick one of our demo twins).
           </li>
           <li>
-            <b>Qloo finds the day.</b> For brunch, an afternoon, dinner and drinks, Qloo&apos;s insights find real places in your city
-            that <i>both</i> tastes point to, in Qloo&apos;s own order, keeping only places you can both go to: Qloo&apos;s halal and vegetarian tags, its price level
-            against your budget, and no bars if one of you doesn&apos;t drink. Nothing is ranked by us: the rehearsals decide.
+            <b>Qloo picks the restaurants.</b> Qloo&apos;s insights take both tastes together and return the restaurants in your city
+            that people with <i>both</i> tastes love, already filtered by Qloo for your food needs (halal, vegetarian, vegan) and your
+            budget. We rank nothing: Qloo&apos;s top ten are all rehearsed.
           </li>
           <li>
-            <b>The twins rehearse it, and you watch.</b> Like Smallville, each rehearsal plays as a little pixel scene drawn from the
-            place&apos;s Qloo tags (a park, a bar with a stage, lanterns for Japanese food): the twins walk in, sit, order, stroll and
-            talk in speech bubbles. They go on the date once at every candidate place, and once at a plain café to compare. We
-            measure how much each wants a second date afterwards, and they mark the lines where something about one of them met
-            something about the place.
+            <b>The twins have dinner everywhere at once, and you watch.</b> Each restaurant is a little room in the style of Tuber
+            Simulator, decorated from its Qloo tags (lanterns, an aquarium, a skyline window, a wine shelf). The twins sit, order from
+            the real menu tags and talk in speech bubbles while heart meters rise and fall. A plain café is rehearsed too, to compare.
           </li>
           <li>
-            <b>You get the best day, with proof.</b> The place per slot that raised that wish most, and why: the quoted line, the minute,
-            what about the person (an introvert, a Spirited Away fan) met what about the place (quiet, Japanese). Every moment is
-            checked against the real profile and the real Qloo features. Plus what to order and what to watch out for.
+            <b>You get the top three, with proof.</b> The restaurants where both twins&apos; wish for a second date rose most above the
+            café, and for each, the moments that did it: the quoted line, the minute, and which thing about one of you (an introvert, a
+            Spirited Away fan) met which Qloo tag of the place (Cozy, Japanese). Every moment is checked against the real profile and the
+            real tags. Click one to watch it happen.
           </li>
         </ol>
       </section>

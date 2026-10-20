@@ -1,26 +1,25 @@
 # Rehearse your first date · The Garden, with taste (Qloo Agentic Hackathon)
 
-You matched. Now your AI twins rehearse a whole day together, at real places Qloo's taste graph picks for both
-of you, and you get the day that brought them closest, with proof: the lines from the rehearsal where something
-about one of you (an introvert, a Spirited Away fan, halal only) met something about the place (quiet, Japanese,
-Qloo-tagged halal), and the minute it happened.
+You matched. Qloo picks the restaurants you would both love, your AI twins have dinner at every one of them (you can
+watch each one as a Tuber Simulator-style room), and you get the three where they fell for each other most, with the
+exact lines and minutes where something about one of you met something Qloo knows about the place.
 
-- **Live demo:** https://garden-qloo.vercel.app (plan a day: about a minute)
+- **Live demo:** https://garden-qloo.vercel.app (rehearse a dinner: under a minute)
 
 ## How Qloo powers it
 
 | Step | Qloo |
 |---|---|
 | Two real tastes | `/search`: you (and your match) pick real films, artists, shows and books; each twin loves those entities |
-| The day's candidates | `/v2/insights` with `filter.type=urn:entity:place`, both people's entities as the signal, `filter.location.query`=your city, and `filter.tags` per slot (cafe/brunch/bakery, museum/gallery/park, restaurant, cocktail/wine bar); Qloo's top 5 per slot are all rehearsed, in Qloo's order, with no ranking of ours |
+| The restaurants | `/v2/insights` with `filter.type=urn:entity:place`, both people's entities as the signal, `filter.location.query`=your city, `filter.tags`=restaurant and `filter.price_level.max`=the lower budget; Qloo's top 10 are all rehearsed, in Qloo's order, with no ranking of ours |
 | Can both go | Qloo's typed tags: `dietary_option` (halal, vegetarian, vegan) via `operator.filter.tags=intersection`, `price_level` against the budget, bars swapped for dessert/tea/night markets if one doesn't drink |
-| The scene | each rehearsal plays as a pixel-art scene (canvas, no engine) whose setting and props come from the place's Qloo kinds and tags; the twins act out each line, and a proof moment lights up the Qloo tag it cites |
+| The rooms | each rehearsal plays as a Tuber Simulator-style pixel room (canvas, no engine) decorated from the restaurant's Qloo kinds and tags; the twins act out each line, and a proof moment lights up the Qloo tag it cites |
 | Proof | each place's Qloo features are numbered (F1…); every moment the twins report must cite a real line, a real profile item and a real feature, or it is dropped |
 | What to order | each place's `menu_highlight` tags: the twins may only order those |
 | The demo twins | `/search` resolves each fictional twin's stated favourites to real entities |
 
-The twins (GLM-5.3 on ILMU, ILMU-mini as fallback) rehearse every candidate once and a plain cafe once as a
-baseline; each place is scored by how much more both want a second date than at the cafe. Qloo responses are
+The twins (GLM-5.3 on ILMU, ILMU-mini as fallback) rehearse every restaurant once and a plain cafe once as a
+baseline; the top three are the restaurants where both want a second date most, compared with the cafe. Qloo responses are
 cached privately on the server and never committed.
 
 ## Run it

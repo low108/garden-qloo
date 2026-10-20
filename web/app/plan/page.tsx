@@ -3,20 +3,15 @@
 import Link from "next/link";
 import { Fragment, useEffect, useRef, useState } from "react";
 import type { Person } from "@/lib/server/garden";
-import type { Candidate, Moment, Rehearsal, Slot } from "@/lib/server/planner";
+import type { Candidate, Moment, Rehearsal } from "@/lib/server/planner";
 import type { Entity, EntityType } from "@/lib/server/qloo";
 import { BUDGETS, DEFAULT_PREFS, DIETS, type Prefs, QUESTIONS } from "@/lib/profile";
 import "../ui.css";
-import DateScene from "./DateScene";
 import "./plan.css";
+import Room from "./Room";
 
-const SLOTS: { slot: Slot; time: string; label: string; icon: string }[] = [
-  { slot: "brunch", time: "10:30", label: "Brunch", icon: "☕" },
-  { slot: "afternoon", time: "13:30", label: "Afternoon", icon: "🌿" },
-  { slot: "dinner", time: "18:30", label: "Dinner", icon: "🍽️" },
-  { slot: "drinks", time: "21:00", label: "After dinner", icon: "🌙" },
-];
-const PARALLEL = 8; // rehearsals in flight at once
+const PARALLEL = 6; // rehearsals in flight at once
+const TOP = 3; // restaurants shown in the result
 const TYPES: { type: EntityType; label: string; hint: string }[] = [
   { type: "movie", label: "Films", hint: "e.g. Spirited Away" },
   { type: "artist", label: "Music", hint: "e.g. Norah Jones" },
@@ -203,14 +198,15 @@ const asPerson = (id: string, name: string, about: string, favs: Entity[], prefs
 });
 
 /** One proof moment: the line, who it moved, what about them, what about the place. */
-function Proof({ m, r, names }: { m: Moment; r: Rehearsal; names: [string, string] }) {
+/** One proof moment: the line, who it moved, what about them met what about the place, and when. */
+function Proof({ m, r, names, onWatch }: { m: Moment; r: Rehearsal; names: [string, string]; onWatch: () => void }) {
   const line = r.lines[m.line];
-  const who = m.who === "a" ? names[0] : names[1];
   return (
     <li className={m.effect > 0 ? "up" : "down"}>
       <q>{line?.say}</q>
       <small>
-        {m.effect > 0 ? "▲" : "▼"} {who} · {m.because} · meets <b>{m.feature.replace(/^menu: /, "")}</b> · ~minute {line?.min ?? "?"}, line {m.line + 1}
+        {m.effect > 0 ? "▲" : "▼"} {m.who === "a" ? names[0] : names[1]} · <b>{m.because}</b> met Qloo&apos;s <b>{m.feature.replace(/^menu: /, "menu: ")}</b> · minute {line?.min ?? "?"} (line {m.line + 1}){" "}
+        <button className="link" onClick={onWatch}>▶ watch this moment</button>
       </small>
     </li>
   );
@@ -255,9 +251,9 @@ export default function Plan() {
   const [runs, setRuns] = useState<Rehearsal[]>([]);
   const [status, setStatus] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [open, setOpen] = useState<string | null>(null);
+  const [watch, setWatch] = useState<{ id: string; line?: number; n: number } | null>(null); // the room in the big player
   const [row, setRow] = useState<string | null>(null);
-  const planRef = useRef<HTMLElement>(null);
+  const viewer = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetch("/api/cast").then((r) => r.json()).then((d) => Array.isArray(d) && setCast(d)).catch(() => {});
@@ -266,21 +262,20 @@ export default function Plan() {
   const you = asPerson("you", name, about, favs, prefs);
   const matchBody = mode === "demo" ? { id: pickId } : { person: asPerson("match", mName, mAbout, mFavs, mPrefs) };
   const ready = favs.length >= 3 && (mode === "demo" ? !!pickId : mFavs.length >= 3);
-  const total = cands.length + 1;
 
-  async function rehearseDay() {
+  async function rehearseDinner() {
     setStage("rehearsing");
     setError(null);
     setRuns([]);
     setCands([]);
-    setOpen(null);
+    setWatch(null);
     setRow(null);
     try {
-      setStatus(`Asking Qloo where you two would love to spend a day in ${city}…`);
+      setStatus(`Asking Qloo which restaurants in ${city} you two would both love…`);
       const c = await post<{ match: Person; candidates: Candidate[] }>("/api/candidates", { you, match: matchBody, city });
       setMatch(c.match);
       setCands(c.candidates);
-      setStatus("Your twins are rehearsing every stop, plus a plain café to compare with…");
+      setStatus(`Your twins are having dinner at all ${c.candidates.length} places at once, and at a plain café to compare. Click any room to watch.`);
       const got: Rehearsal[] = [];
       await pool([null, ...c.candidates], PARALLEL, (place) => post<Rehearsal>("/api/rehearse", { you, match: matchBody, place }), (_, r) => {
         got.push(r);
@@ -288,48 +283,41 @@ export default function Plan() {
       });
       setStatus("");
       setStage("done");
-      setTimeout(() => planRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setStatus("");
     }
   }
 
-  const base = runs.find((r) => r.venue === null);
+  const base = runs.find((r) => r.venue === null) ?? null;
   const baseline = base ? score(base) : 0;
-  const of = (id: string) => runs.find((r) => r.venue === id);
+  const of = (id: string) => runs.find((r) => r.venue === id) ?? null;
   const gain = (id: string) => {
     const r = of(id);
     return r && base ? score(r) - baseline : null;
   };
-  const winners = SLOTS.map((s) => {
-    const opts = cands.filter((c) => c.slot === s.slot);
-    const best = [...opts].sort((a, b) => (gain(b.id) ?? -99) - (gain(a.id) ?? -99))[0];
-    return { ...s, best, opts };
-  });
-  const winIds = winners.map((w) => w.best?.id).filter(Boolean) as string[];
+  const ranked = [...cands].filter((c) => of(c.id)).sort((a, b) => (gain(b.id) ?? -99) - (gain(a.id) ?? -99));
+  const top = ranked.slice(0, TOP);
   const mname = match?.name ?? (mode === "demo" ? cast.find((c) => c.id === pickId)?.name : mName) ?? "your match";
   const names: [string, string] = [you.name, mname];
-  // What lifted them and what to be careful with, across the day's stops, from the checked moments.
-  const across = (effect: 1 | -1) => {
-    const n = new Map<string, number>();
-    winIds.forEach((id) => of(id)?.moments.filter((m) => m.effect === effect).forEach((m) => {
-      const k = `${m.who === "a" ? you.name : mname} ${m.because}`;
-      n.set(k, (n.get(k) ?? 0) + 1);
-    }));
-    return [...n.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k]) => k);
-  };
   const picked = cast.find((c) => c.id === pickId);
+  const baseScores = base ? { a: base.aAfter, b: base.bAfter } : null;
+  const open = (id: string, line?: number) => {
+    setWatch((w) => ({ id, line, n: (w?.n ?? 0) + 1 }));
+    setTimeout(() => viewer.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  };
+  const watched = watch ? (watch.id === "cafe" ? null : cands.find((c) => c.id === watch.id) ?? null) : null;
+  const watchedRun = watch ? (watch.id === "cafe" ? base : of(watch.id)) : null;
 
   return (
     <main className="try plan">
       <nav className="crumbs">
         <Link href="/">The Garden</Link>
       </nav>
-      <h1>Rehearse your first date</h1>
+      <h1>Rehearse your first dinner</h1>
       <p className="lede">
-        You matched. Now your AI twins rehearse a whole day together at real places Qloo picks for both of you, and you get the day that
-        went best, with the moments that prove why.
+        You matched. Qloo picks the restaurants you would both love, your AI twins have dinner at every one of them, and you get the three
+        where they fell for each other most, with the exact moments that prove why.
       </p>
 
       {stage === "input" && (
@@ -366,169 +354,146 @@ export default function Plan() {
               </select>
             </label>
           </div>
-          <button className="go" disabled={!ready} onClick={rehearseDay}>
-            {ready ? "Rehearse our day →" : "Pick favourites for both of you"}
+          <button className="go" disabled={!ready} onClick={rehearseDinner}>
+            {ready ? "Rehearse our dinner →" : "Pick favourites for both of you"}
           </button>
         </section>
       )}
 
       {stage !== "input" && (
-        <section className="card">
-          <h2>
-            {you.name} &amp; {mname} · {city}
-          </h2>
+        <section className="card building-card">
+          <h2>{you.name} &amp; {mname} · dinner in {city}</h2>
           <p className="meta small">
-            {runs.length} of {total} rehearsals done{base ? ` · plain café baseline: ${baseline.toFixed(0)}/100` : ""}
+            {runs.length} of {cands.length + 1} dinners rehearsed{base ? ` · plain café: ${baseline.toFixed(0)}/100` : ""}
+            {stage === "rehearsing" && cands.length > 0 && " · each room starts playing as soon as its dinner is done"}
           </p>
-          <div className="slots">
-            {winners.map((w) => (
-              <div key={w.slot} className="slot">
-                <h3>
-                  {w.icon} {w.label} <small>{w.time}</small>
-                </h3>
-                {w.opts.map((c) => {
-                  const g = gain(c.id);
-                  const r = of(c.id);
-                  const won = stage === "done" && w.best?.id === c.id;
-                  return (
-                    <div key={c.id} className={`cand ${won ? "won" : ""}`}>
-                      <b>{c.name}</b>
-                      <small>{c.kinds.filter((k) => k !== "Place").slice(0, 2).join(" · ")}</small>
-                      {c.fits.length > 0 && <small className="fit">✓ {c.fits.slice(0, 2).join(" · ")}</small>}
-                      <div className="runs">
-                        <span className={`dot ${r ? (g !== null && g >= 0 ? "up" : "down") : "wait"}`} title={r ? `${score(r).toFixed(0)}/100` : "rehearsing…"} />
-                        {r && <small>{r.moments.length} proof moment{r.moments.length === 1 ? "" : "s"}</small>}
-                        {g !== null && <span className={`gain ${g >= 0 ? "up" : "down"}`}>{g >= 0 ? "+" : ""}{g.toFixed(1)}</span>}
-                      </div>
-                    </div>
-                  );
-                })}
+          {watch && (
+            <div ref={viewer} className="viewer">
+              <div className="viewer-head">
+                <b>Watching: {watched?.name ?? "Plain café (baseline)"}</b>
+                <button className="link" onClick={() => setWatch(null)}>close ×</button>
               </div>
-            ))}
+              <Room key={`${watch.id}-${watch.n}`} r={watchedRun} place={watched} names={names} base={baseScores} startLine={watch.line} />
+            </div>
+          )}
+          <div className="building">
+            {[{ id: "cafe" } as const, ...cands].map((c) => {
+              const isCafe = c.id === "cafe";
+              const cand = isCafe ? null : (c as Candidate);
+              const r = isCafe ? base : of(c.id);
+              const g = isCafe ? null : gain(c.id);
+              const rank = top.findIndex((t) => t.id === c.id);
+              return (
+                <div key={c.id} className={`floor-tile ${stage === "done" && rank >= 0 ? "top" : ""} ${watch?.id === c.id ? "watching" : ""}`}>
+                  <Room r={r} place={cand} names={names} base={isCafe ? null : baseScores} compact onOpen={() => open(c.id)} label={isCafe ? "Plain café (baseline)" : cand!.name} />
+                  <div className="tile-foot">
+                    <small>{isCafe ? "the comparison" : cand!.kinds.filter((k) => k !== "Place" && k !== "Restaurant").slice(0, 2).join(" · ") || "Restaurant"}</small>
+                    {g !== null && <span className={`gain ${g >= 0 ? "up" : "down"}`}>{g >= 0 ? "+" : ""}{g.toFixed(1)}</span>}
+                    {stage === "done" && rank >= 0 && <span className="pill">#{rank + 1}</span>}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </section>
       )}
 
       {stage === "done" && (
-        <section className="card day" ref={planRef}>
-          <h2>Your first date with {mname}</h2>
-          <p className="meta">Each stop is the place where your twins&apos; wish for a second date rose most compared with the same two of you at a plain café, with the moments from the rehearsal that explain why.</p>
+        <section className="card day">
+          <h2>Your top {top.length} for dinner with {mname}</h2>
+          <p className="meta">Ranked only by the rehearsals: how much more both twins wanted a second date (0-100, averaged) than the same two of you at a plain café. Under each, the moments that made the difference.</p>
           <details className="how-qloo">
             <summary>How Qloo works in this simulation</summary>
             <ol>
-              <li><b>Your tastes become a signal.</b> The films, music, shows and books you both picked are Qloo entities. Qloo&apos;s
-                <code>/v2/insights</code> takes both sets together as <code>signal.interests.entities</code> and returns real places in{" "}
-                {city} that people with <i>both</i> tastes tend to love, one query per slot (café/brunch, park/museum/gallery,
-                restaurant, bar or dessert).</li>
-              <li><b>Your needs become filters.</b> Halal or vegetarian is sent as Qloo&apos;s <code>dietary_option</code> tag with an
-                intersection filter, the budget is checked against Qloo&apos;s <code>price_level</code>, and bars are swapped for dessert or tea if one of you
-                doesn&apos;t drink. These rules only remove places; nothing is ranked by us. Qloo&apos;s top five per slot are all
-                rehearsed, in Qloo&apos;s order.</li>
-              <li><b>Qloo&apos;s tags become the world.</b> Each place&apos;s Qloo tags (kinds, ambience, cuisine, menu highlights) are
-                numbered F1, F2… and handed to the twins as everything they know about it. The scene is drawn from them too: a park, a
-                bar with a stage for live music, lanterns for Japanese food.</li>
-              <li><b>The twins live it.</b> GLM-5.3 voices each twin from your profile only, at that place, for about 90 minutes. They may
-                only order dishes from Qloo&apos;s menu tags.</li>
-              <li><b>Every reason is checked.</b> When a line moves one of them, it must cite a profile item (A3: &quot;is an
-                introvert&quot;) and a Qloo feature (F2: &quot;Quiet&quot;). We drop any moment that cites something that isn&apos;t there.
-                The same two at a plain café, with no Qloo data, is the baseline each place is compared with.</li>
+              <li><b>Your tastes become a signal.</b> The films, music, shows and books you both picked are Qloo entities. Qloo&apos;s{" "}
+                <code>/v2/insights</code> takes both sets together and returns the restaurants in {city} that people with <i>both</i> tastes
+                tend to love, in Qloo&apos;s order.</li>
+              <li><b>Your needs remove places, nothing else.</b> Halal or vegetarian is sent as Qloo&apos;s <code>dietary_option</code> tag
+                (a place must have it), the budget is checked against Qloo&apos;s <code>price_level</code>, and places that aren&apos;t
+                for dates are dropped. We rank nothing: Qloo&apos;s top {cands.length} are all rehearsed.</li>
+              <li><b>Qloo&apos;s tags become the room.</b> Each restaurant&apos;s Qloo tags (cuisine, ambience, menu highlights) are
+                numbered F1, F2… and are all the twins know about it; they can only order from the menu tags. The room is drawn from
+                them too: lanterns for Japanese, an aquarium for seafood, a skyline window for a rooftop.</li>
+              <li><b>The twins have dinner.</b> GLM-5.3 voices each twin from your profile only. Afterwards each says how much they want a
+                second date.</li>
+              <li><b>Every reason is checked.</b> A moment must quote a real line, a real item from that person&apos;s profile and a real
+                Qloo tag of the place, or we drop it.</li>
             </ol>
           </details>
-          <ol className="timeline">
-            {winners.filter((w) => w.best).map((w) => {
-              const c = w.best!;
-              const r = of(c.id);
+          <ol className="podium">
+            {top.map((c, i) => {
+              const r = of(c.id)!;
               const g = gain(c.id) ?? 0;
-              const ups = r?.moments.filter((m) => m.effect > 0).sort((x, y) => x.line - y.line) ?? [];
-              const downs = r?.moments.filter((m) => m.effect < 0).sort((x, y) => x.line - y.line) ?? [];
-              const tryThis = r?.order.length ? r.order : c.menu.slice(0, 3);
+              const ups = r.moments.filter((m) => m.effect > 0).sort((x, y) => x.line - y.line);
+              const downs = r.moments.filter((m) => m.effect < 0).sort((x, y) => x.line - y.line);
+              const tryThis = r.order.length ? r.order : c.menu.slice(0, 3);
               return (
-                <li key={w.slot}>
-                  <span className="when">{w.time}</span>
+                <li key={c.id}>
+                  <span className="rank">#{i + 1}</span>
                   <div>
                     <h3>
-                      {w.icon} {c.name}
+                      {c.name}
                       <span className={`gain ${g >= 0 ? "up" : "down"}`}>{g >= 0 ? "+" : ""}{g.toFixed(1)} vs café</span>
                     </h3>
-                    {c.address && <small className="addr">{c.address} · <a href={maps(c, city)} target="_blank" rel="noreferrer">Map ↗</a></small>}
-                    {(c.fits.length > 0 || c.links.length > 0) && (
-                      <p className="why-qloo">
-                        <span>Why Qloo suggested it:</span> {[...c.fits, ...c.links.map((l) => `echoes your taste: ${l}`)].join(" · ")}
-                      </p>
-                    )}
+                    <small className="addr">
+                      {c.kinds.filter((k) => k !== "Place").slice(0, 3).join(" · ")}
+                      {c.address && <> · {c.address} · <a href={maps(c, city)} target="_blank" rel="noreferrer">Map ↗</a></>}
+                    </small>
+                    <p className="scores">{names[0]} {r.aAfter}/100 · {names[1]} {r.bAfter}/100{base && <> (café: {base.aAfter} / {base.bAfter})</>}</p>
                     {ups.length > 0 && (
                       <>
-                        <p className="label">Why it worked for you two</p>
-                        <ul className="proofs">{ups.map((m, i) => <Proof key={i} m={m} r={r!} names={names} />)}</ul>
+                        <p className="label">Why affection rose: the proof</p>
+                        <ul className="proofs">{ups.map((m, k) => <Proof key={k} m={m} r={r} names={names} onWatch={() => open(c.id, m.line)} />)}</ul>
                       </>
                     )}
                     {downs.length > 0 && (
                       <>
                         <p className="label">Watch out</p>
-                        <ul className="proofs">{downs.map((m, i) => <Proof key={i} m={m} r={r!} names={names} />)}</ul>
+                        <ul className="proofs">{downs.map((m, k) => <Proof key={k} m={m} r={r} names={names} onWatch={() => open(c.id, m.line)} />)}</ul>
                       </>
                     )}
                     {tryThis.length > 0 && <p className="try-this"><span>Try:</span> {tryThis.join(" · ")}</p>}
-                    {r && <DateScene key={c.id} r={r} names={names} place={c} start={w.time} />}
-                    <button className="link" onClick={() => setOpen(open === w.slot ? null : w.slot)}>
-                      {open === w.slot ? "Hide the transcript" : "Read the transcript"}
-                    </button>
-                    {open === w.slot && r && <Transcript r={r} names={names} />}
+                    {c.fits.length > 0 && <p className="why-qloo"><span>Good to know:</span> {c.fits.join(" · ")}</p>}
+                    <button className="link" onClick={() => open(c.id)}>▶ Watch the whole dinner</button>
                   </div>
                 </li>
               );
             })}
           </ol>
-          <div className="talk">
-            <p><span>💬 What lifted you both:</span> {across(1).join(" · ") || "—"}</p>
-            <p><span>🙊 Be careful with:</span> {across(-1).join(" · ") || "—"}</p>
-          </div>
-          <p className="meta small">
-            Places, menus, food tags and the taste behind them come from Qloo for both of you together. Each moment is checked: it must quote
-            a real line, a real item from that person&apos;s profile, and a real Qloo feature of the place. One rehearsal per place (GLM-5.3):
-            a guide to a good day, not a guarantee.
-          </p>
-          <button className="go ghost" onClick={() => { setStage("input"); setRuns([]); setCands([]); }}>Plan another day</button>
+          <button className="go ghost" onClick={() => { setStage("input"); setRuns([]); setCands([]); setWatch(null); }}>Plan another dinner</button>
         </section>
       )}
 
       {stage === "done" && (
         <section className="card all">
-          <h2>All {runs.length} rehearsals</h2>
-          <p className="meta small">Every place Qloo suggested, and the plain café your twins also rehearsed at for comparison. Scores are how much each twin wants a second date afterwards (0-100). Click a row to read the rehearsal, with the proof moments highlighted.</p>
+          <h2>All {runs.length} dinners</h2>
+          <p className="meta small">Every restaurant Qloo suggested, in order of how much affection rose, and the plain café. Click a row to read the conversation with the proof moments highlighted.</p>
           <div className="table-wrap">
             <table className="rehearsals">
               <thead>
-                <tr>
-                  <th>Slot</th><th>Place</th><th>Score<small>{you.name} / {mname}</small></th><th>vs café</th><th>Proof</th><th>Strongest moment</th>
-                </tr>
+                <tr><th>#</th><th>Restaurant</th><th>Score<small>{names[0]} / {names[1]}</small></th><th>vs café</th><th>Proof</th><th>Strongest moment</th></tr>
               </thead>
               <tbody>
-                {[{ id: "cafe", slot: null as Slot | null, name: "Plain café (baseline)", kinds: [] as string[] }, ...cands].map((c) => {
-                  const r = c.id === "cafe" ? base : of(c.id);
-                  const g = c.id === "cafe" ? null : gain(c.id);
-                  const slot = SLOTS.find((s) => s.slot === c.slot);
-                  const won = winIds.includes(c.id);
-                  const top = r?.moments.find((m) => m.effect > 0) ?? r?.moments[0];
-                  const ups = r?.moments.filter((m) => m.effect > 0).length ?? 0;
-                  const downs = (r?.moments.length ?? 0) - ups;
+                {[...ranked.map((c) => ({ c, r: of(c.id)! })), ...(base ? [{ c: null, r: base }] : [])].map(({ c, r }, i) => {
+                  const id = c?.id ?? "cafe";
+                  const g = c ? gain(c.id) : null;
+                  const m1 = r.moments.find((m) => m.effect > 0) ?? r.moments[0];
+                  const ups = r.moments.filter((m) => m.effect > 0).length;
                   return (
-                    <Fragment key={c.id}>
-                      <tr className={`${won ? "won" : ""} ${c.id === "cafe" ? "base" : ""} ${row === c.id ? "open" : ""}`} onClick={() => setRow(row === c.id ? null : c.id)} tabIndex={0} onKeyDown={(e) => e.key === "Enter" && setRow(row === c.id ? null : c.id)} aria-expanded={row === c.id}>
-                        <td>{slot ? `${slot.icon} ${slot.label}` : "—"}</td>
-                        <td><b>{c.name}</b>{won && <span className="pill">in your plan</span>}<small>{c.kinds.filter((k) => k !== "Place").slice(0, 2).join(" · ")}</small></td>
-                        <td className="num">{r ? `${r.aAfter} / ${r.bAfter}` : "…"}</td>
+                    <Fragment key={id}>
+                      <tr className={`${c && i < TOP ? "won" : ""} ${c ? "" : "base"} ${row === id ? "open" : ""}`} onClick={() => setRow(row === id ? null : id)} tabIndex={0} onKeyDown={(e) => e.key === "Enter" && setRow(row === id ? null : id)} aria-expanded={row === id}>
+                        <td>{c ? i + 1 : "—"}</td>
+                        <td><b>{c?.name ?? "Plain café (baseline)"}</b>{c && i < TOP && <span className="pill">top {TOP}</span>}<small>{c?.kinds.filter((k) => k !== "Place").slice(0, 2).join(" · ")}</small></td>
+                        <td className="num">{r.aAfter} / {r.bAfter}</td>
                         <td className={`num ${g === null ? "" : g >= 0 ? "up" : "down"}`}>{g === null ? "—" : `${g >= 0 ? "+" : ""}${g.toFixed(1)}`}</td>
-                        <td className="num">{r ? <><span className="up">▲{ups}</span> <span className="down">▼{downs}</span></> : "…"}</td>
-                        <td className="quote">{top && r ? <>“{r.lines[top.line]?.say}”<small>{top.because} × {top.feature.replace(/^menu: /, "")}</small></> : "—"}</td>
+                        <td className="num"><span className="up">▲{ups}</span> <span className="down">▼{r.moments.length - ups}</span></td>
+                        <td className="quote">{m1 ? <>“{r.lines[m1.line]?.say}”<small>{m1.because} × {m1.feature.replace(/^menu: /, "")} · min {r.lines[m1.line]?.min}</small></> : "—"}</td>
                       </tr>
-                      {row === c.id && r && (
-                        <tr className="detail">
-                          <td colSpan={6}>
-                            <DateScene r={r} names={names} place={c.id === "cafe" ? null : (c as Candidate)} start={slot?.time} />
-                            <Transcript r={r} names={names} />
-                          </td>
-                        </tr>
+                      {row === id && (
+                        <tr className="detail"><td colSpan={6}>
+                          <button className="link" onClick={() => open(id)}>▶ Watch this dinner</button>
+                          <Transcript r={r} names={names} />
+                        </td></tr>
                       )}
                     </Fragment>
                   );
@@ -542,7 +507,7 @@ export default function Plan() {
       {status && <p className="status">{status}</p>}
       {error && (
         <p className="error">
-          {error} <button className="link" onClick={rehearseDay}>Try again</button>
+          {error} <button className="link" onClick={rehearseDinner}>Try again</button>
         </p>
       )}
     </main>

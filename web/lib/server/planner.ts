@@ -9,25 +9,20 @@ import { json } from "./llm";
 import type { Person } from "./garden";
 import { DIETS, type Prefs, profileItems } from "../profile";
 
-export type Slot = "brunch" | "afternoon" | "dinner" | "drinks";
+export type Slot = "dinner";
 const T = (s: string) => `urn:tag:${s}`;
-const BAR_TAGS = ["category:place:cocktail_bar", "category:place:wine_bar", "category:place:bar", "category:place:live_music_venue"].map(T);
-const SOBER_TAGS = ["genre:place:restaurant:dessert", "category:place:tea_house", "category:place:night_market", "category:place:live_music_venue"].map(T);
+// One dinner: Qloo's restaurants for both tastes, each rehearsed, and the best three kept.
 export const SLOTS: { slot: Slot; time: string; label: string; tags: string[]; food: boolean }[] = [
-  { slot: "brunch", time: "10:30", label: "Brunch", food: true, tags: ["category:place:cafe", "genre:place:restaurant:brunch", "category:place:bakery"].map(T) },
-  { slot: "afternoon", time: "13:30", label: "Afternoon", food: false,
-    tags: ["category:place:museum", "category:place:art_gallery", "category:place:park", "category:place:book_store", "category:place:board_game_club"].map(T) },
-  { slot: "dinner", time: "18:30", label: "Dinner", food: true, tags: [T("category:place:restaurant")] },
-  { slot: "drinks", time: "21:00", label: "After dinner", food: false, tags: BAR_TAGS },
+  { slot: "dinner", time: "19:00", label: "Dinner", food: true, tags: [T("category:place:restaurant")] },
 ];
 const DIET_TAG: Partial<Record<Prefs["diet"][number], string>> = {
   halal: T("dietary_option:qloo:halal"), vegetarian: T("dietary_option:qloo:vegetarian"), vegan: T("dietary_option:qloo:vegan"),
 };
-// How many of Qloo's recommendations per slot get rehearsed, in Qloo's order. Every one is rehearsed; this only
-// caps the day's model calls and wait (4 slots x 5 + the cafe = 21 rehearsals).
-export const PLACES_PER_SLOT = 5;
+// How many of Qloo's restaurants get rehearsed, in Qloo's order. Every one is rehearsed; this only caps the model
+// calls and the wait (10 + the plain cafe = 11 rehearsals, about 40 seconds).
+export const PLACES_PER_SLOT = 10;
 // Not first-date places: hotels, places of worship, youth and community centres, shops, corporate clubs.
-const NOT_A_DATE = /hotel|resort|temple|church|mosque|dargah|shrine|cathedral|school|kids|child|youth|community|hospital|store\b|club ?house|members|corporate|office|canteen|cafeteria|food court|supermarket|coworking/i;
+const NOT_A_DATE = /hotel|resort|temple|church|mosque|dargah|shrine|cathedral|school|kids|child|youth|community|hospital|store\b|club ?house|members|social club|private club|country club|corporate|office|canteen|cafeteria|food court|supermarket|coworking/i;
 // A street address or a whole neighbourhood rather than one place you can book ("10 Winstedt Road", "Dempsey Hill").
 const AREA = /^\d+[a-z]? [\w ]+ (road|rd|street|st|avenue|ave|lane)$|^[\w ]+ (hill|village|quarter|district|precinct)$/i;
 const QUIET = /quiet|cozy|calm|tranquil|relax|peaceful|intimate|serene/i;
@@ -82,12 +77,12 @@ export async function candidates(a: Person, b: Person, city: string): Promise<Ca
   const used = new Set<string>();
   const out: Candidate[] = [];
   for (const s of SLOTS) {
-    const tags = s.slot === "drinks" && sober ? SOBER_TAGS : s.tags;
-    const food = s.food || (s.slot === "drinks" && sober);
+    const tags = s.tags;
+    const food = s.food;
     // Food needs are hard rules: each category is asked for together with every diet tag (a cafe AND halal).
     const lists = food && dietTags.length
-      ? await Promise.all(tags.map((t) => placesFor(ids, city, [t, ...dietTags], 25, true)))
-      : [await placesFor(ids, city, tags, 25)];
+      ? await Promise.all(tags.map((t) => placesFor(ids, city, [t, ...dietTags], 50, true, budget)))
+      : [await placesFor(ids, city, tags, 50, false, budget)];
     // Several lists (one per category) are taken in turn, so each keeps Qloo's own order.
     const seen = new Set<string>();
     const pool = Array.from({ length: Math.max(...lists.map((l) => l.length), 0) }, (_, i) => lists.map((l) => l[i]))
@@ -105,7 +100,6 @@ export async function candidates(a: Person, b: Person, city: string): Promise<Ca
       const rules = [
         ...(food ? diet.map((d) => (DIET_TAG[d] ? `Qloo tags it ${DIETS[d].toLowerCase()}: confirm before booking` : `${DIETS[d].toLowerCase()}: check the menu`)) : []),
         ...(p.price ? [`price ${"$".repeat(p.price)}, within budget`] : []),
-        ...(s.slot === "drinks" && sober ? ["no alcohol needed"] : []),
       ];
       out.push({ ...p, slot: s.slot, fits: [...rules, ...f.fits], links: f.links });
     }

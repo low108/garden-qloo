@@ -51,7 +51,7 @@ const str2 = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slic
 export function candidate(raw: unknown): Candidate {
   const v = (raw ?? {}) as Record<string, unknown>;
   const list = (x: unknown, n: number, max: number) => (Array.isArray(x) ? x.map((s) => str2(s, max)).filter(Boolean).slice(0, n) : []);
-  const slot = ["brunch", "afternoon", "dinner", "drinks"].includes(String(v.slot)) ? (v.slot as Slot) : "afternoon";
+  const slot: Slot = "dinner";
   if (typeof v.id !== "string" || !/^[A-Za-z0-9-]{8,64}$/.test(v.id)) throw new Error("bad place");
   return {
     id: v.id, name: str2(v.name, 100), type: "place", slot, address: str2(v.address, 160) || undefined,
