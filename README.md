@@ -23,11 +23,6 @@ The twins (GLM-5.3 on ILMU, ILMU-mini as fallback) rehearse every candidate once
 baseline; each place is scored by how much more both want a second date than at the cafe. Qloo responses are
 cached privately on the server and never committed.
 
-**Why a planner, not a matchmaker:** we first tried to predict who matches. On 4,089 real speed dates, Qloo taste
-overlap was a coin flip (AUC 0.48, `scripts/qloo_benchmark.py`); simulated dates grounded in Qloo did better than
-ungrounded ones but only modestly (AUC 0.56 vs 0.51 on 60 women, `scripts/qloo_sim_experiment.py`). So the
-product helps a couple who already matched have a good first day instead.
-
 ## Run it
 
 ```bash
