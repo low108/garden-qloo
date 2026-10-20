@@ -39,3 +39,7 @@ data/models/
 
 # Firebase deploy cache
 .firebase/
+
+# Qloo responses and results: cache privately, never publish (Qloo hackathon rules)
+data/qloo_cache/
+data/qloo_*.json
