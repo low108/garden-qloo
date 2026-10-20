@@ -1,0 +1,36 @@
+.plan h3 { font-size: 16px; margin: 0 0 8px; }
+.plan h3.gap, .plan .row.gap { margin-top: 22px; }
+.plan .row label.grow { flex: 3 1 260px; }
+.tabs.mode { display: flex; gap: 6px; margin-bottom: 12px; }
+.tabs.mode button { font: inherit; font-size: 14px; border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: 999px; padding: 6px 14px; cursor: pointer; }
+.tabs.mode button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+.people.pickable .person { text-align: left; font: inherit; color: var(--text); cursor: pointer; }
+.people.pickable .person.picked { border-color: var(--accent); background: var(--hers); box-shadow: 0 0 0 2px var(--accent) inset; }
+.people.pickable .favs { display: flex; margin-top: 8px; }
+
+.slots { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.slot h3 small { color: var(--muted); font-weight: 400; }
+.cand { border: 1px solid var(--border); border-radius: 12px; padding: 10px; margin-bottom: 8px; background: var(--bg); transition: border-color 0.3s; }
+.cand b { display: block; font-size: 14px; line-height: 1.25; }
+.cand small { display: block; color: var(--muted); font-size: 12px; }
+.cand.won { border-color: var(--accent); background: var(--hers); }
+.runs { display: flex; align-items: center; gap: 5px; margin-top: 6px; }
+.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--border); }
+.dot.wait { animation: pulse 1.2s ease-in-out infinite; }
+.dot.up { background: var(--accent); }
+.dot.down { background: #d1495b; }
+.gain { font-size: 12px; font-weight: 700; margin-left: auto; padding: 1px 7px; border-radius: 999px; }
+.gain.up { color: var(--accent); background: var(--hers); }
+.gain.down { color: #d1495b; background: var(--hot); }
+
+.day .timeline { list-style: none; padding: 0; margin: 16px 0; display: grid; gap: 16px; }
+.day .timeline > li { display: grid; grid-template-columns: 60px 1fr; gap: 12px; }
+.day .when { font-weight: 800; color: var(--accent); padding-top: 2px; }
+.day .timeline h3 { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 18px; margin: 0; }
+.day .timeline .gain { margin-left: 0; }
+.day .addr { display: block; color: var(--muted); font-size: 13px; margin: 2px 0 6px; }
+.day .addr a { color: var(--accent); }
+.day .spark { font-style: italic; background: var(--diary); border-radius: 10px; padding: 8px 12px; margin: 6px 0; }
+.day .try-this span, .day .talk span { color: var(--muted); }
+.day .talk { border-top: 1px solid var(--border); padding-top: 12px; }
+.day .talk p { margin: 4px 0; }

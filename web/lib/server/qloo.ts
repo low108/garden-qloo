@@ -19,6 +19,7 @@ export type Entity = {
   tags: string[]; // human-readable tag names, most telling first
   kinds: string[]; // what the entity is, from its genre and category tags ("Cafe", "Museum", ...)
   flags: string[]; // tags that rule a place out for a date ("University campus", "Five star" hotel, ...)
+  menu: string[]; // a place's menu highlights (dishes and drinks), from its menu_highlight tags
 };
 
 // The parts of Qloo's JSON this file reads.
@@ -101,6 +102,7 @@ function toEntity(e: RawEntity, fallbackType?: EntityType): Entity {
       .map((t) => t.name!),
     kinds: tags.filter((t) => KIND_TAGS.test(t.type ?? "") && t.name).map((t) => t.name!),
     flags: tags.filter((t) => FLAG_TAGS.test(`${t.type ?? ""}:${t.name ?? ""}`)).map((t) => t.name ?? ""),
+    menu: tags.filter((t) => /menu_highlight/.test(t.type ?? "") && t.name).map((t) => t.name!).slice(0, 5),
   };
 }
 
@@ -124,6 +126,19 @@ export async function insights(
   const d = await get("/v2/insights", params);
   const ents = d.results && !Array.isArray(d.results) ? (d.results.entities ?? []) : [];
   return ents.map((e) => toEntity(e, type));
+}
+
+/** Places in a city that a set of entities (two people's favourites) points to, limited to some categories (tag IDs, any of). */
+export async function placesFor(entities: string[], city: string, tags: string[], take = 12): Promise<Entity[]> {
+  const d = await get("/v2/insights", {
+    "filter.type": "urn:entity:place",
+    "signal.interests.entities": entities.join(","),
+    "filter.location.query": city,
+    "filter.tags": tags.join(","),
+    take,
+  });
+  const ents = d.results && !Array.isArray(d.results) ? (d.results.entities ?? []) : [];
+  return ents.map((e) => toEntity(e, "place"));
 }
 
 /** Weighted Jaccard of two taste profiles (entity id -> affinity): 0 nothing shared, 1 identical. */

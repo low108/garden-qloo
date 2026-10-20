@@ -1,29 +1,28 @@
-# The Garden, with taste · Qloo Agentic Hackathon
+# Rehearse your first date · The Garden, with taste (Qloo Agentic Hackathon)
 
-**Don't match tastes. Simulate them.** Your AI twin goes on the first dates for you, in a world built from
-Qloo's taste graph, and you meet the one it would run away with.
+You matched. Now your AI twins rehearse a whole day together, at real places Qloo's taste graph picks for both
+of you, a few times over, and you get the day that brought them closest: where to go, what to order, what to
+talk about.
 
-- **Live demo:** https://garden-qloo.vercel.app (try it: about a minute)
-- **Why simulate:** on 4,089 real speed dates, Qloo taste overlap predicted mutual matches no better than chance
-  (AUC 0.48); see `/experiment` and `scripts/qloo_benchmark.py`.
-- **Why Qloo inside the simulation:** the same 60 real women dated in the Garden with and without Qloo grounding
-  (real venues + common ground). Only the Qloo-grounded twins' after-date feelings picked out real matches better
-  than chance (AUC 0.56, p ≈ 0.01; plain 0.51). The head-to-head gap is suggestive, not yet conclusive (p ≈ 0.07).
-  See `scripts/qloo_sim_experiment.py`.
+- **Live demo:** https://garden-qloo.vercel.app (plan a day: about a minute)
 
 ## How Qloo powers it
 
 | Step | Qloo |
 |---|---|
-| Your taste | `/search`: pick real films, artists, shows and books; your twin loves those entities |
-| The demo twins | `/search` resolves each twin's stated favourites to real entities |
-| Every date's venue | `/v2/insights` (`filter.type=urn:entity:place`, both twins' entities, `filter.location.query`=your city), filtered to date spots by typed `genre`/`category` tags |
-| Common ground on the date | `/v2/insights` for films and artists seeded by both twins, minus what they listed |
-| The taste-score baseline | `/v2/insights` across films, music, TV and books per person; weighted Jaccard of affinities |
-| Your first-date plan | the same place insights in your city, plus common ground to talk about |
+| Two real tastes | `/search`: you (and your match) pick real films, artists, shows and books; each twin loves those entities |
+| The day's candidates | `/v2/insights` with `filter.type=urn:entity:place`, both people's entities as the signal, `filter.location.query`=your city, and `filter.tags` per slot (cafe/brunch/bakery, museum/gallery/park, restaurant, cocktail/wine bar) |
+| What to order | each place's `menu_highlight` tags: the twins may only order those |
+| The demo twins | `/search` resolves each fictional twin's stated favourites to real entities |
 
-Twins are voiced by GLM-5.3 on ILMU (ILMU-mini as fallback). Qloo responses are cached privately on the server
-(Next.js data cache, `data/qloo_cache/` for the benchmark) and never committed.
+The twins (GLM-5.3 on ILMU, ILMU-mini as fallback) rehearse every candidate twice and a plain cafe twice as a
+baseline; each place is scored by how much more both want a second date than at the cafe. Qloo responses are
+cached privately on the server and never committed.
+
+**Why a planner, not a matchmaker:** we first tried to predict who matches. On 4,089 real speed dates, Qloo taste
+overlap was a coin flip (AUC 0.48, `scripts/qloo_benchmark.py`); simulated dates grounded in Qloo did better than
+ungrounded ones but only modestly (AUC 0.56 vs 0.51 on 60 women, `scripts/qloo_sim_experiment.py`). So the
+product helps a couple who already matched have a good first day instead.
 
 ## Run it
 
