@@ -1,32 +1,45 @@
+/* Mostly black and white, like Hinge; colour only where it means something: honey (Bumble) for the winners,
+   rose for hearts. */
 :root {
-  --bg: #faf8f3;
-  --text: #1f1d1a;
-  --muted: #6b665d;
-  --accent: #2f6f4e;
+  --bg: #ffffff;
+  --surface: #f5f3f0;
+  --text: #121212;
+  --muted: #6f6a64;
+  --border: #e7e3dd;
+  --accent: #121212; /* buttons and selected chips */
+  --on-accent: #ffffff;
+  --honey: #ffc629;
+  --honey-ink: #3a2c00;
+  --heart: #e8365d;
+  --up: #1f7a4d;
+  --down: #c2334d;
   --card: #ffffff;
-  --border: #e3ded3;
   --error: #b3261e;
-  --hers: #e3f1e8;
-  --his: #f1efe9;
-  --thread: #f7f5ef;
-  --hot: #fff1d6;
-  --diary: #fbf6ea;
+  --hers: #f5f3f0;
+  --his: #ece9e4;
+  --diary: #f5f3f0;
+  --hot: #fdecef;
+  --radius: 16px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #171614;
-    --text: #ece8df;
-    --muted: #a39d92;
-    --accent: #6fbf94;
-    --card: #211f1c;
-    --border: #36322c;
+    --bg: #0f0f0f;
+    --surface: #1b1a19;
+    --text: #f4f2ef;
+    --muted: #a39e97;
+    --border: #2c2a28;
+    --accent: #f4f2ef;
+    --on-accent: #121212;
+    --honey-ink: #3a2c00;
+    --up: #5fd39a;
+    --down: #ff7d95;
+    --card: #161615;
     --error: #f2b8b5;
-    --hers: #1f3a2c;
-    --his: #2c2925;
-    --thread: #1b1a18;
-    --hot: #3a2f1a;
-    --diary: #24211c;
+    --hers: #1b1a19;
+    --his: #252321;
+    --diary: #1b1a19;
+    --hot: #3a1d24;
   }
 }
 
@@ -38,12 +51,13 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family: var(--sans), system-ui, -apple-system, "Segoe UI", sans-serif;
   line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
 }
 
 a {
-  color: var(--accent);
+  color: var(--text);
 }
 
 .lede,

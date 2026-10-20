@@ -12,11 +12,11 @@ export default function Home() {
       </p>
       <p>
         <Link className="go" href="/plan">
-          Rehearse our dinner (under a minute) →
+          Rehearse our dinner →
         </Link>
       </p>
 
-      <section className="card">
+      <section className="how">
         <h2>How it works</h2>
         <ol className="steps">
           <li>
@@ -43,7 +43,7 @@ export default function Home() {
         </ol>
       </section>
 
-      <section className="card">
+      <section className="how">
         <h2>More</h2>
         <ul className="links">
           <li>

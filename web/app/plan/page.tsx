@@ -12,6 +12,7 @@ import Room from "./Room";
 
 const PARALLEL = 6; // rehearsals in flight at once
 const TOP = 3; // restaurants shown in the result
+const STEPS = 5; // the setup screens
 const TYPES: { type: EntityType; label: string; hint: string }[] = [
   { type: "movie", label: "Films", hint: "e.g. Spirited Away" },
   { type: "artist", label: "Music", hint: "e.g. Norah Jones" },
@@ -197,17 +198,19 @@ const asPerson = (id: string, name: string, about: string, favs: Entity[], prefs
   about: about.split(/(?<=[.!?])\s+/).map((s) => s.trim()).filter(Boolean).slice(0, 3), favourites: favs, prefs,
 });
 
-/** One proof moment: the line, who it moved, what about them, what about the place. */
-/** One proof moment: the line, who it moved, what about them met what about the place, and when. */
+/** One proof moment as a Hinge-style prompt card: when, the line, what about them met what about the place. */
 function Proof({ m, r, names, onWatch }: { m: Moment; r: Rehearsal; names: [string, string]; onWatch: () => void }) {
   const line = r.lines[m.line];
   return (
-    <li className={m.effect > 0 ? "up" : "down"}>
-      <q>{line?.say}</q>
-      <small>
-        {m.effect > 0 ? "▲" : "▼"} {m.who === "a" ? names[0] : names[1]} · <b>{m.because}</b> met Qloo&apos;s <b>{m.feature.replace(/^menu: /, "menu: ")}</b> · minute {line?.min ?? "?"} (line {m.line + 1}){" "}
-        <button className="link" onClick={onWatch}>▶ watch this moment</button>
-      </small>
+    <li className={`prompt-card ${m.effect > 0 ? "up" : "down"}`}>
+      <small className="eyebrow">{m.effect > 0 ? "The moment it clicked" : "Where it wobbled"} · minute {line?.min ?? "?"}</small>
+      <p className="quote">{line?.say}</p>
+      <div className="match-tags">
+        <span className="tag who">{m.who === "a" ? names[0] : names[1]} {m.because}</span>
+        <span className="x">×</span>
+        <span className="tag qloo">Qloo: {m.feature.replace(/^menu: /, "on the menu: ")}</span>
+      </div>
+      <button className="play-btn" onClick={onWatch} aria-label={`Watch this moment, line ${m.line + 1}`}>▶</button>
     </li>
   );
 }
@@ -234,6 +237,7 @@ function Transcript({ r, names }: { r: Rehearsal; names: [string, string] }) {
 
 export default function Plan() {
   const [stage, setStage] = useState<"input" | "rehearsing" | "done">("input");
+  const [step, setStep] = useState(0);
   const [name, setName] = useState("");
   const [about, setAbout] = useState("");
   const [favs, setFavs] = useState<Entity[]>([]);
@@ -253,6 +257,7 @@ export default function Plan() {
   const [error, setError] = useState<string | null>(null);
   const [watch, setWatch] = useState<{ id: string; line?: number; n: number } | null>(null); // the room in the big player
   const [row, setRow] = useState<string | null>(null);
+  const [more, setMore] = useState<Set<string>>(new Set()); // restaurants with every proof moment shown
   const viewer = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -261,7 +266,9 @@ export default function Plan() {
 
   const you = asPerson("you", name, about, favs, prefs);
   const matchBody = mode === "demo" ? { id: pickId } : { person: asPerson("match", mName, mAbout, mFavs, mPrefs) };
-  const ready = favs.length >= 3 && (mode === "demo" ? !!pickId : mFavs.length >= 3);
+  const matchOk = mode === "demo" ? !!pickId : mFavs.length >= 3;
+  const ready = favs.length >= 3 && matchOk;
+  const stepOk = [true, favs.length >= 3, true, matchOk, true][step];
 
   async function rehearseDinner() {
     setStage("rehearsing");
@@ -275,7 +282,7 @@ export default function Plan() {
       const c = await post<{ match: Person; candidates: Candidate[] }>("/api/candidates", { you, match: matchBody, city });
       setMatch(c.match);
       setCands(c.candidates);
-      setStatus(`Your twins are having dinner at all ${c.candidates.length} places at once, and at a plain café to compare. Click any room to watch.`);
+      setStatus("");
       const got: Rehearsal[] = [];
       await pool([null, ...c.candidates], PARALLEL, (place) => post<Rehearsal>("/api/rehearse", { you, match: matchBody, place }), (_, r) => {
         got.push(r);
@@ -314,55 +321,105 @@ export default function Plan() {
       <nav className="crumbs">
         <Link href="/">The Garden</Link>
       </nav>
-      <h1>Rehearse your first dinner</h1>
-      <p className="lede">
-        You matched. Qloo picks the restaurants you would both love, your AI twins have dinner at every one of them, and you get the three
-        where they fell for each other most, with the exact moments that prove why.
-      </p>
+      {(stage !== "input" || step === 0) && (
+        <>
+          <h1>{stage === "input" ? "Rehearse your first dinner" : `${you.name} & ${mname}`}</h1>
+          <p className="lede">
+            {stage === "input"
+              ? "You matched. Qloo picks the restaurants you would both love, your AI twins have dinner at every one of them, and you get the three where they fell for each other most, with the exact moments that prove why."
+              : `Dinner in ${city}. Your twins are eating at every restaurant Qloo picked for you both, plus a plain café to compare. Tap any room to watch.`}
+          </p>
+        </>
+      )}
 
       {stage === "input" && (
-        <section className="card">
-          <PersonForm title="1 · You" whose="you" name={name} setName={setName} about={about} setAbout={setAbout} favs={favs} setFavs={setFavs} prefs={prefs} setPrefs={setPrefs} placeholder={["Mira", "I collect vinyl. I want someone who cooks with me."]} />
-          <h3 className="gap">2 · Your match</h3>
-          <div className="tabs mode" role="tablist">
-            <button role="tab" aria-selected={mode === "demo"} className={mode === "demo" ? "on" : ""} onClick={() => setMode("demo")}>Pick a demo twin</button>
-            <button role="tab" aria-selected={mode === "custom"} className={mode === "custom" ? "on" : ""} onClick={() => setMode("custom")}>Enter their profile</button>
-          </div>
-          {mode === "demo" ? (
+        <section className="steps-card">
+          <div className="progress" aria-hidden><span style={{ width: `${((step + 1) / STEPS) * 100}%` }} /></div>
+          {step === 0 && (
             <>
-              <div className="people pickable">
-                {cast.map((p) => (
-                  <button key={p.id} className={`person ${pickId === p.id ? "picked" : ""}`} onClick={() => setPickId(p.id)} aria-pressed={pickId === p.id}>
-                    <b>{p.name}</b>
-                    <small>{p.age} · {p.work}</small>
-                    <small className="prefline">{prefsLine(p.prefs)}</small>
-                    <span className="favs small">{p.favourites.map((f) => <Fav key={f.id} e={f} />)}</span>
-                  </button>
-                ))}
-                {!cast.length && <p className="meta">Loading the demo twins from Qloo…</p>}
-              </div>
-              {picked && <p className="meta small">{picked.name}: {picked.about.join(" ")}</p>}
+              <h2 className="ask">What&apos;s your first name?</h2>
+              <input className="big-input" value={name} onChange={(e) => setName(e.target.value)} maxLength={40} placeholder="Mira" autoFocus />
+              <h2 className="ask small-ask">Two things about you</h2>
+              <p className="hint">Your twin says only what you tell it.</p>
+              <textarea className="prompt-input" value={about} onChange={(e) => setAbout(e.target.value)} maxLength={300} rows={3} placeholder="I collect vinyl. I want someone who cooks with me." />
             </>
-          ) : (
-            <PersonForm title="" whose="them" name={mName} setName={setMName} about={mAbout} setAbout={setMAbout} favs={mFavs} setFavs={setMFavs} prefs={mPrefs} setPrefs={setMPrefs} placeholder={["Arjun", "I cook for my whole street. I want someone who laughs loudly."]} />
           )}
-          <div className="row gap">
-            <label>
-              3 · Where
-              <select value={city} onChange={(e) => setCity(e.target.value)}>
-                {CITIES.map((c) => <option key={c}>{c}</option>)}
-              </select>
-            </label>
-          </div>
-          <button className="go" disabled={!ready} onClick={rehearseDinner}>
-            {ready ? "Rehearse our dinner →" : "Pick favourites for both of you"}
-          </button>
+          {step === 1 && (
+            <>
+              <h2 className="ask">Pick three things you love</h2>
+              <p className="hint">Films, music, TV or books. Qloo uses them to find restaurants you&apos;d both love.</p>
+              <Picker picked={favs} onPick={(e) => setFavs(favs.length < 8 ? [...favs, e] : favs)} />
+              <div className="favs">{favs.map((f) => <Fav key={f.id} e={f} onRemove={() => setFavs(favs.filter((x) => x.id !== f.id))} />)}</div>
+            </>
+          )}
+          {step === 2 && (
+            <>
+              <h2 className="ask">How are you on a first date?</h2>
+              <p className="hint">These decide what Qloo may suggest, and how your twin feels in each room.</p>
+              <PrefsForm prefs={prefs} set={setPrefs} />
+            </>
+          )}
+          {step === 3 && (
+            <>
+              <h2 className="ask">Who did you match with?</h2>
+              <div className="tabs mode seg" role="tablist">
+                <button role="tab" aria-selected={mode === "demo"} className={mode === "demo" ? "on" : ""} onClick={() => setMode("demo")}>A demo twin</button>
+                <button role="tab" aria-selected={mode === "custom"} className={mode === "custom" ? "on" : ""} onClick={() => setMode("custom")}>Someone real</button>
+              </div>
+              {mode === "demo" ? (
+                <div className="profiles">
+                  {cast.map((p) => (
+                    <article key={p.id} className={`profile-card ${pickId === p.id ? "picked" : ""}`}>
+                      <header>
+                        <h3>{p.name}</h3>
+                        <small>{p.age} · {p.work}</small>
+                      </header>
+                      {p.about[1] && (
+                        <div className="prompt">
+                          <small>In their words</small>
+                          <p>{p.about[1]}</p>
+                        </div>
+                      )}
+                      <span className="favs small">{p.favourites.map((f) => <Fav key={f.id} e={f} />)}</span>
+                      <small className="prefline">{prefsLine(p.prefs)}</small>
+                      <button className="heart-btn" onClick={() => setPickId(p.id)} aria-pressed={pickId === p.id} aria-label={`Choose ${p.name}`}>♥</button>
+                    </article>
+                  ))}
+                  {!cast.length && <p className="meta">Loading the demo twins from Qloo…</p>}
+                </div>
+              ) : (
+                <PersonForm title="" whose="them" name={mName} setName={setMName} about={mAbout} setAbout={setMAbout} favs={mFavs} setFavs={setMFavs} prefs={mPrefs} setPrefs={setMPrefs} placeholder={["Arjun", "I cook for my whole street. I want someone who laughs loudly."]} />
+              )}
+            </>
+          )}
+          {step === 4 && (
+            <>
+              <h2 className="ask">Where&apos;s dinner?</h2>
+              <div className="chips-col">
+                {CITIES.map((c) => (
+                  <button key={c} className={`chip big ${city === c ? "on" : ""}`} aria-pressed={city === c} onClick={() => setCity(c)}>{c}</button>
+                ))}
+              </div>
+              <p className="hint">
+                {you.name} &amp; {mode === "demo" ? picked?.name ?? "your match" : mName || "your match"}: Qloo picks ten restaurants in {city} for both of
+                you, your twins have dinner at every one, and you get the top three. Under a minute.
+              </p>
+            </>
+          )}
+          <footer className="step-nav">
+            {step > 0 ? <button className="link" onClick={() => setStep(step - 1)}>Back</button> : <span />}
+            {step < STEPS - 1 ? (
+              <button className="next" disabled={!stepOk} onClick={() => setStep(step + 1)} aria-label="Next">→</button>
+            ) : (
+              <button className="go" disabled={!ready} onClick={rehearseDinner}>Rehearse our dinner</button>
+            )}
+          </footer>
         </section>
       )}
 
       {stage !== "input" && (
         <section className="card building-card">
-          <h2>{you.name} &amp; {mname} · dinner in {city}</h2>
+                    {status && <p className="status">{status}</p>}
           <p className="meta small">
             {runs.length} of {cands.length + 1} dinners rehearsed{base ? ` · plain café: ${baseline.toFixed(0)}/100` : ""}
             {stage === "rehearsing" && cands.length > 0 && " · each room starts playing as soon as its dinner is done"}
@@ -428,39 +485,38 @@ export default function Plan() {
               const downs = r.moments.filter((m) => m.effect < 0).sort((x, y) => x.line - y.line);
               const tryThis = r.order.length ? r.order : c.menu.slice(0, 3);
               return (
-                <li key={c.id}>
-                  <span className="rank">#{i + 1}</span>
-                  <div>
-                    <h3>
-                      {c.name}
-                      <span className={`gain ${g >= 0 ? "up" : "down"}`}>{g >= 0 ? "+" : ""}{g.toFixed(1)} vs café</span>
-                    </h3>
-                    <small className="addr">
-                      {c.kinds.filter((k) => k !== "Place").slice(0, 3).join(" · ")}
-                      {c.address && <> · {c.address} · <a href={maps(c, city)} target="_blank" rel="noreferrer">Map ↗</a></>}
-                    </small>
-                    <p className="scores">{names[0]} {r.aAfter}/100 · {names[1]} {r.bAfter}/100{base && <> (café: {base.aAfter} / {base.bAfter})</>}</p>
-                    {ups.length > 0 && (
-                      <>
-                        <p className="label">Why affection rose: the proof</p>
-                        <ul className="proofs">{ups.map((m, k) => <Proof key={k} m={m} r={r} names={names} onWatch={() => open(c.id, m.line)} />)}</ul>
-                      </>
-                    )}
-                    {downs.length > 0 && (
-                      <>
-                        <p className="label">Watch out</p>
-                        <ul className="proofs">{downs.map((m, k) => <Proof key={k} m={m} r={r} names={names} onWatch={() => open(c.id, m.line)} />)}</ul>
-                      </>
-                    )}
-                    {tryThis.length > 0 && <p className="try-this"><span>Try:</span> {tryThis.join(" · ")}</p>}
-                    {c.fits.length > 0 && <p className="why-qloo"><span>Good to know:</span> {c.fits.join(" · ")}</p>}
-                    <button className="link" onClick={() => open(c.id)}>▶ Watch the whole dinner</button>
+                <li key={c.id} className="venue-profile">
+                  <header>
+                    <span className="rank">{i + 1}</span>
+                    <div>
+                      <h3>{c.name}</h3>
+                      <small>{c.kinds.filter((k) => k !== "Place").slice(0, 3).join(" · ")}{c.price ? ` · ${"$".repeat(c.price)}` : ""}</small>
+                    </div>
+                  </header>
+                  <div className="stats">
+                    <span className="stat honey"><b>{g >= 0 ? "+" : ""}{g.toFixed(1)}</b> affection vs café</span>
+                    <span className="stat"><i className="dot a" /> {names[0]} <b>{r.aAfter}</b>{base && <small> / café {base.aAfter}</small>}</span>
+                    <span className="stat"><i className="dot b" /> {names[1]} <b>{r.bAfter}</b>{base && <small> / café {base.bAfter}</small>}</span>
+                  </div>
+                  {ups.length > 0 && <ul className="proofs">{ups.slice(0, more.has(c.id) ? ups.length : 3).map((m, k) => <Proof key={k} m={m} r={r} names={names} onWatch={() => open(c.id, m.line)} />)}</ul>}
+                  {ups.length > 3 && !more.has(c.id) && <button className="link" onClick={() => setMore(new Set([...more, c.id]))}>Show {ups.length - 3} more moments</button>}
+                  {downs.length > 0 && <ul className="proofs">{downs.map((m, k) => <Proof key={k} m={m} r={r} names={names} onWatch={() => open(c.id, m.line)} />)}</ul>}
+                  {tryThis.length > 0 && (
+                    <div className="prompt-card plain">
+                      <small className="eyebrow">What to order</small>
+                      <p className="quote">{tryThis.join(", ")}</p>
+                    </div>
+                  )}
+                  {c.fits.length > 0 && <p className="hint">Good to know: {c.fits.join(" · ")}</p>}
+                  <div className="actions">
+                    <button className="go" onClick={() => open(c.id)}>Watch the whole dinner</button>
+                    {c.address && <a className="go ghost" href={maps(c, city)} target="_blank" rel="noreferrer">Map</a>}
                   </div>
                 </li>
               );
             })}
           </ol>
-          <button className="go ghost" onClick={() => { setStage("input"); setRuns([]); setCands([]); setWatch(null); }}>Plan another dinner</button>
+          <button className="go ghost" onClick={() => { setStage("input"); setStep(3); setRuns([]); setCands([]); setWatch(null); }}>Try another match</button>
         </section>
       )}
 
@@ -504,7 +560,6 @@ export default function Plan() {
         </section>
       )}
 
-      {status && <p className="status">{status}</p>}
       {error && (
         <p className="error">
           {error} <button className="link" onClick={rehearseDinner}>Try again</button>
