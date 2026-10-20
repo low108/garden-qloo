@@ -20,6 +20,8 @@ export type Entity = {
   kinds: string[]; // what the entity is, from its genre and category tags ("Cafe", "Museum", ...)
   flags: string[]; // tags that rule a place out for a date ("University campus", "Five star" hotel, ...)
   menu: string[]; // a place's menu highlights (dishes and drinks), from its menu_highlight tags
+  vibe: string[]; // every descriptive tag (ambience, noise, decor, setting, cuisine, diet, kind...): what a place is like
+  price?: number; // 1-4, when Qloo knows it
 };
 
 // The parts of Qloo's JSON this file reads.
@@ -30,7 +32,7 @@ type RawEntity = {
   type?: string;
   subtype?: string;
   types?: string[];
-  properties?: { image?: { url?: string }; release_year?: number; address?: string };
+  properties?: { image?: { url?: string }; release_year?: number; address?: string; price_level?: number };
   query?: { affinity?: number };
   tags?: RawTag[];
 };
@@ -103,6 +105,14 @@ function toEntity(e: RawEntity, fallbackType?: EntityType): Entity {
     kinds: [...new Set(tags.filter((t) => KIND_TAGS.test(t.type ?? "") && t.name).map((t) => t.name!))],
     flags: tags.filter((t) => FLAG_TAGS.test(`${t.type ?? ""}:${t.name ?? ""}`)).map((t) => t.name ?? ""),
     menu: tags.filter((t) => /menu_highlight/.test(t.type ?? "") && t.name).map((t) => t.name!).slice(0, 5),
+    vibe: [
+      ...new Set(
+        tags
+          .filter((t) => t.name && /ambience|noise|decor|setting|neighborhood|cuisine|culinary|dietary|genre|category|good_for|activit|offerings|time_of_day|style|keyword|subgenre/.test(t.type ?? ""))
+          .map((t) => t.name!),
+      ),
+    ].slice(0, 30),
+    price: p.price_level ?? undefined,
   };
 }
 
@@ -128,13 +138,15 @@ export async function insights(
   return ents.map((e) => toEntity(e, type));
 }
 
-/** Places in a city that a set of entities (two people's favourites) points to, limited to some categories (tag IDs, any of). */
-export async function placesFor(entities: string[], city: string, tags: string[], take = 12): Promise<Entity[]> {
+/** Places in a city that a set of entities (two people's favourites) points to, limited by tag IDs: any of them,
+ *  or all of them when `all` (e.g. a cafe that is also halal). */
+export async function placesFor(entities: string[], city: string, tags: string[], take = 12, all = false): Promise<Entity[]> {
   const d = await get("/v2/insights", {
     "filter.type": "urn:entity:place",
     "signal.interests.entities": entities.join(","),
     "filter.location.query": city,
     "filter.tags": tags.join(","),
+    ...(all ? { "operator.filter.tags": "intersection" } : {}),
     take,
   });
   const ents = d.results && !Array.isArray(d.results) ? (d.results.entities ?? []) : [];

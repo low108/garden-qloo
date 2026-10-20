@@ -2,6 +2,7 @@
 import "server-only";
 import type { Person } from "./garden";
 import type { Candidate, Slot } from "./planner";
+import { parsePrefs } from "../profile";
 import type { Entity, EntityType } from "./qloo";
 
 const TYPES = new Set<EntityType>(["movie", "artist", "tv_show", "book", "place", "destination", "podcast", "video_game"]);
@@ -12,9 +13,11 @@ export function city(v: unknown): string {
 }
 
 export function entity(raw: unknown): Entity | null {
-  const v = (raw ?? {}) as { id?: unknown; name?: unknown; type?: unknown };
+  const v = (raw ?? {}) as { id?: unknown; name?: unknown; type?: unknown; tags?: unknown };
   if (typeof v.id !== "string" || !/^[A-Za-z0-9-]{8,64}$/.test(v.id) || !TYPES.has(v.type as EntityType)) return null;
-  return { id: v.id, name: str(v.name, 120), type: v.type as EntityType, tags: [], kinds: [], flags: [], menu: [] };
+  // Its Qloo tags (from the search result) come along, short and plain: they explain why a place fits.
+  const tags = (Array.isArray(v.tags) ? v.tags : []).map((t) => str(t, 40)).filter(Boolean).slice(0, 8);
+  return { id: v.id, name: str(v.name, 120), type: v.type as EntityType, tags, kinds: [], flags: [], menu: [], vibe: [] };
 }
 
 /** A person typed into the form (you, or your match): a name, a few facts and 3-8 real favourites. */
@@ -36,6 +39,7 @@ export function you(raw: unknown): Person {
     work: str(v.work, 60) || "not saying",
     about: (Array.isArray(v.about) ? v.about : []).map((s: unknown) => str(s, 160)).filter(Boolean).slice(0, 3),
     favourites,
+    prefs: parsePrefs(v.prefs),
   };
 }
 
@@ -51,6 +55,8 @@ export function candidate(raw: unknown): Candidate {
   if (typeof v.id !== "string" || !/^[A-Za-z0-9-]{8,64}$/.test(v.id)) throw new Error("bad place");
   return {
     id: v.id, name: str2(v.name, 100), type: "place", slot, address: str2(v.address, 160) || undefined,
-    tags: list(v.tags, 6, 40), kinds: list(v.kinds, 4, 40), flags: [], menu: list(v.menu, 5, 60),
+    tags: list(v.tags, 6, 40), kinds: list(v.kinds, 4, 40), flags: [], menu: list(v.menu, 5, 60), vibe: list(v.vibe, 30, 40),
+    price: [1, 2, 3, 4].includes(Number(v.price)) ? Number(v.price) : undefined,
+    fits: list(v.fits, 8, 80), links: list(v.links, 6, 40),
   };
 }

@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { Fragment, useEffect, useRef, useState } from "react";
 import type { Person } from "@/lib/server/garden";
-import type { Candidate, Rehearsal, Slot } from "@/lib/server/planner";
+import type { Candidate, Moment, Rehearsal, Slot } from "@/lib/server/planner";
 import type { Entity, EntityType } from "@/lib/server/qloo";
+import { BUDGETS, DEFAULT_PREFS, DIETS, type Prefs, QUESTIONS } from "@/lib/profile";
 import "../ui.css";
 import "./plan.css";
 
@@ -12,10 +13,9 @@ const SLOTS: { slot: Slot; time: string; label: string; icon: string }[] = [
   { slot: "brunch", time: "10:30", label: "Brunch", icon: "☕" },
   { slot: "afternoon", time: "13:30", label: "Afternoon", icon: "🌿" },
   { slot: "dinner", time: "18:30", label: "Dinner", icon: "🍽️" },
-  { slot: "drinks", time: "21:00", label: "After dinner", icon: "🍸" },
+  { slot: "drinks", time: "21:00", label: "After dinner", icon: "🌙" },
 ];
-const RUNS = 2; // rehearsals per place
-const PARALLEL = 6; // rehearsals in flight at once
+const PARALLEL = 5; // rehearsals in flight at once
 const TYPES: { type: EntityType; label: string; hint: string }[] = [
   { type: "movie", label: "Films", hint: "e.g. Spirited Away" },
   { type: "artist", label: "Music", hint: "e.g. Norah Jones" },
@@ -46,7 +46,6 @@ async function pool<T, R>(items: T[], n: number, work: (t: T) => Promise<R>, don
 
 const kindOf = (t: EntityType) => ({ movie: "film", artist: "music", tv_show: "TV", book: "book" })[t as string] ?? t;
 const score = (r: Rehearsal) => (r.aAfter + r.bAfter) / 2;
-const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / Math.max(1, xs.length);
 const maps = (p: Entity, city: string) => `https://www.google.com/maps/search/${encodeURIComponent(`${p.name} ${p.address ?? city}`)}`;
 
 function Fav({ e, onRemove }: { e: Entity; onRemove?: () => void }) {
@@ -114,45 +113,141 @@ function Picker({ onPick, picked }: { onPick: (e: Entity) => void; picked: Entit
   );
 }
 
-/** Name, two facts and favourites for one person. */
+/** The quick questions: energy, nerves, date style, novelty, food needs, alcohol, budget. */
+function PrefsForm({ prefs, set }: { prefs: Prefs; set: (p: Prefs) => void }) {
+  const chip = (on: boolean, label: string, onClick: () => void) => (
+    <button key={label} className={`chip ${on ? "on" : ""}`} aria-pressed={on} onClick={onClick}>
+      {label}
+    </button>
+  );
+  return (
+    <div className="prefs">
+      {(Object.keys(QUESTIONS) as (keyof typeof QUESTIONS)[]).map((k) => (
+        <div key={k} className="q">
+          <span>{QUESTIONS[k].label}</span>
+          <div>
+            {Object.entries(QUESTIONS[k].options).map(([v, label]) =>
+              chip(prefs[k] === v, label, () => set({ ...prefs, [k]: v } as Prefs)),
+            )}
+          </div>
+        </div>
+      ))}
+      <div className="q">
+        <span>Food needs</span>
+        <div>
+          {(Object.entries(DIETS) as [Prefs["diet"][number], string][]).map(([d, label]) =>
+            chip(prefs.diet.includes(d), label, () =>
+              set({ ...prefs, diet: prefs.diet.includes(d) ? prefs.diet.filter((x) => x !== d) : [...prefs.diet, d] }),
+            ),
+          )}
+        </div>
+      </div>
+      <div className="q">
+        <span>Drinks alcohol</span>
+        <div>
+          {chip(prefs.drinks, "Yes", () => set({ ...prefs, drinks: true }))}
+          {chip(!prefs.drinks, "No", () => set({ ...prefs, drinks: false }))}
+        </div>
+      </div>
+      <div className="q">
+        <span>Budget</span>
+        <div>
+          {([1, 2, 3, 4] as const).map((b) => chip(prefs.budget === b, BUDGETS[b], () => set({ ...prefs, budget: b })))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const prefsLine = (p: Prefs) =>
+  [
+    QUESTIONS.energy.options[p.energy],
+    p.nerves === "calm" ? "calm on dates" : `${QUESTIONS.nerves.options[p.nerves].toLowerCase()} nervous`,
+    QUESTIONS.style.options[p.style].toLowerCase(),
+    ...p.diet.map((d) => DIETS[d]),
+    p.drinks ? "" : "no alcohol",
+    BUDGETS[p.budget],
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+/** Name, two facts, favourites and the quick questions, for one person. */
 function PersonForm(p: {
   title: string;
+  whose: string;
   name: string; setName: (s: string) => void;
   about: string; setAbout: (s: string) => void;
   favs: Entity[]; setFavs: (f: Entity[]) => void;
+  prefs: Prefs; setPrefs: (p: Prefs) => void;
   placeholder: [string, string];
-  whose?: string;
 }) {
   return (
     <>
-      <h3>{p.title}</h3>
+      {p.title && <h3>{p.title}</h3>}
       <div className="row">
         <label>Name<input value={p.name} onChange={(e) => p.setName(e.target.value)} maxLength={40} placeholder={p.placeholder[0]} /></label>
-        <label className="grow">Two things about {p.whose ?? "them"}<input value={p.about} onChange={(e) => p.setAbout(e.target.value)} maxLength={300} placeholder={p.placeholder[1]} /></label>
+        <label className="grow">Two things about {p.whose}<input value={p.about} onChange={(e) => p.setAbout(e.target.value)} maxLength={300} placeholder={p.placeholder[1]} /></label>
       </div>
       <p className="meta small">At least 3 favourites: films, music, TV or books.</p>
       <Picker picked={p.favs} onPick={(e) => p.setFavs(p.favs.length < 8 ? [...p.favs, e] : p.favs)} />
       <div className="favs">{p.favs.map((f) => <Fav key={f.id} e={f} onRemove={() => p.setFavs(p.favs.filter((x) => x.id !== f.id))} />)}</div>
+      <PrefsForm prefs={p.prefs} set={p.setPrefs} />
     </>
   );
 }
 
-const asPerson = (id: string, name: string, about: string, favs: Entity[]) => ({
+const asPerson = (id: string, name: string, about: string, favs: Entity[], prefs: Prefs) => ({
   id, name: name.trim() || (id === "you" ? "You" : "Your match"), gender: "f" as const, age: 0, work: "",
-  about: about.split(/(?<=[.!?])\s+/).map((s) => s.trim()).filter(Boolean).slice(0, 3), favourites: favs,
+  about: about.split(/(?<=[.!?])\s+/).map((s) => s.trim()).filter(Boolean).slice(0, 3), favourites: favs, prefs,
 });
+
+/** One proof moment: the line, who it moved, what about them, what about the place. */
+function Proof({ m, r, names }: { m: Moment; r: Rehearsal; names: [string, string] }) {
+  const line = r.lines[m.line];
+  const who = m.who === "a" ? names[0] : names[1];
+  return (
+    <li className={m.effect > 0 ? "up" : "down"}>
+      <q>{line?.say}</q>
+      <small>
+        {m.effect > 0 ? "▲" : "▼"} {who} · {m.because} · meets <b>{m.feature.replace(/^menu: /, "")}</b> · ~minute {line?.min ?? "?"}, line {m.line + 1}
+      </small>
+    </li>
+  );
+}
+
+function Transcript({ r, names }: { r: Rehearsal; names: [string, string] }) {
+  const at = new Map(r.moments.map((m) => [m.line, m]));
+  return (
+    <ul className="chat">
+      {r.lines.map((l, i) => {
+        const m = at.get(i);
+        return (
+          <li key={i} className={`${l.who === "a" ? "you" : "them"} ${m ? (m.effect > 0 ? "proof up" : "proof down") : ""}`}>
+            <small>
+              {l.who === "a" ? names[0] : names[1]} · min {l.min}
+              {m && ` · ${m.effect > 0 ? "▲" : "▼"} ${m.because} × ${m.feature.replace(/^menu: /, "")}`}
+            </small>
+            {l.say}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
 
 export default function Plan() {
   const [stage, setStage] = useState<"input" | "rehearsing" | "done">("input");
   const [name, setName] = useState("");
   const [about, setAbout] = useState("");
   const [favs, setFavs] = useState<Entity[]>([]);
+  const [prefs, setPrefs] = useState<Prefs>(DEFAULT_PREFS);
   const [mode, setMode] = useState<"demo" | "custom">("demo");
   const [cast, setCast] = useState<Person[]>([]);
   const [pickId, setPickId] = useState<string>("");
   const [mName, setMName] = useState("");
   const [mAbout, setMAbout] = useState("");
   const [mFavs, setMFavs] = useState<Entity[]>([]);
+  const [mPrefs, setMPrefs] = useState<Prefs>(DEFAULT_PREFS);
   const [city, setCity] = useState("Singapore");
   const [match, setMatch] = useState<Person | null>(null);
   const [cands, setCands] = useState<Candidate[]>([]);
@@ -160,17 +255,17 @@ export default function Plan() {
   const [status, setStatus] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
-  const [row, setRow] = useState<string | null>(null); // the place whose rehearsals are open in the table
+  const [row, setRow] = useState<string | null>(null);
   const planRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     fetch("/api/cast").then((r) => r.json()).then((d) => Array.isArray(d) && setCast(d)).catch(() => {});
   }, []);
 
-  const you = asPerson("you", name, about, favs);
-  const matchBody = mode === "demo" ? { id: pickId } : { person: asPerson("match", mName, mAbout, mFavs) };
+  const you = asPerson("you", name, about, favs, prefs);
+  const matchBody = mode === "demo" ? { id: pickId } : { person: asPerson("match", mName, mAbout, mFavs, mPrefs) };
   const ready = favs.length >= 3 && (mode === "demo" ? !!pickId : mFavs.length >= 3);
-  const total = (cands.length + 1) * RUNS;
+  const total = cands.length + 1;
 
   async function rehearseDay() {
     setStage("rehearsing");
@@ -178,16 +273,15 @@ export default function Plan() {
     setRuns([]);
     setCands([]);
     setOpen(null);
+    setRow(null);
     try {
       setStatus(`Asking Qloo where you two would love to spend a day in ${city}…`);
       const c = await post<{ match: Person; candidates: Candidate[] }>("/api/candidates", { you, match: matchBody, city });
       setMatch(c.match);
       setCands(c.candidates);
-      setStatus("Your twins are rehearsing every stop, twice, plus a plain café to compare with…");
-      const jobs: { place: Candidate | null; run: number }[] = [];
-      for (let run = 1; run <= RUNS; run++) jobs.push({ place: null, run }, ...c.candidates.map((place) => ({ place, run })));
+      setStatus("Your twins are rehearsing every stop, plus a plain café to compare with…");
       const got: Rehearsal[] = [];
-      await pool(jobs, PARALLEL, (j) => post<Rehearsal>("/api/rehearse", { you, match: matchBody, place: j.place, run: j.run }), (_, r) => {
+      await pool([null, ...c.candidates], PARALLEL, (place) => post<Rehearsal>("/api/rehearse", { you, match: matchBody, place }), (_, r) => {
         got.push(r);
         setRuns([...got]);
       });
@@ -200,21 +294,31 @@ export default function Plan() {
     }
   }
 
-  const baseline = mean(runs.filter((r) => r.venue === null).map(score));
-  const of = (id: string) => runs.filter((r) => r.venue === id);
-  const gain = (id: string) => (of(id).length ? mean(of(id).map(score)) - baseline : null);
+  const base = runs.find((r) => r.venue === null);
+  const baseline = base ? score(base) : 0;
+  const of = (id: string) => runs.find((r) => r.venue === id);
+  const gain = (id: string) => {
+    const r = of(id);
+    return r && base ? score(r) - baseline : null;
+  };
   const winners = SLOTS.map((s) => {
     const opts = cands.filter((c) => c.slot === s.slot);
     const best = [...opts].sort((a, b) => (gain(b.id) ?? -99) - (gain(a.id) ?? -99))[0];
     return { ...s, best, opts };
   });
-  const tally = (key: "landed" | "flat", ids: string[]) => {
-    const n = new Map<string, number>();
-    runs.filter((r) => r.venue && ids.includes(r.venue)).forEach((r) => r[key].forEach((t) => n.set(t.toLowerCase(), (n.get(t.toLowerCase()) ?? 0) + 1)));
-    return [...n.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([t]) => t);
-  };
   const winIds = winners.map((w) => w.best?.id).filter(Boolean) as string[];
   const mname = match?.name ?? (mode === "demo" ? cast.find((c) => c.id === pickId)?.name : mName) ?? "your match";
+  const names: [string, string] = [you.name, mname];
+  // What lifted them and what to be careful with, across the day's stops, from the checked moments.
+  const across = (effect: 1 | -1) => {
+    const n = new Map<string, number>();
+    winIds.forEach((id) => of(id)?.moments.filter((m) => m.effect === effect).forEach((m) => {
+      const k = `${m.who === "a" ? you.name : mname} ${m.because}`;
+      n.set(k, (n.get(k) ?? 0) + 1);
+    }));
+    return [...n.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k]) => k);
+  };
+  const picked = cast.find((c) => c.id === pickId);
 
   return (
     <main className="try plan">
@@ -223,31 +327,35 @@ export default function Plan() {
       </nav>
       <h1>Rehearse your first date</h1>
       <p className="lede">
-        You matched. Now your AI twins rehearse a whole day together at real places Qloo picks for both of your tastes, and you get the
-        day that went best.
+        You matched. Now your AI twins rehearse a whole day together at real places Qloo picks for both of you, and you get the day that
+        went best, with the moments that prove why.
       </p>
 
       {stage === "input" && (
         <section className="card">
-          <PersonForm title="1 · You" name={name} setName={setName} about={about} setAbout={setAbout} favs={favs} setFavs={setFavs} whose="you" placeholder={["Mira", "I collect vinyl. I want someone who cooks with me."]} />
+          <PersonForm title="1 · You" whose="you" name={name} setName={setName} about={about} setAbout={setAbout} favs={favs} setFavs={setFavs} prefs={prefs} setPrefs={setPrefs} placeholder={["Mira", "I collect vinyl. I want someone who cooks with me."]} />
           <h3 className="gap">2 · Your match</h3>
           <div className="tabs mode" role="tablist">
             <button role="tab" aria-selected={mode === "demo"} className={mode === "demo" ? "on" : ""} onClick={() => setMode("demo")}>Pick a demo twin</button>
-            <button role="tab" aria-selected={mode === "custom"} className={mode === "custom" ? "on" : ""} onClick={() => setMode("custom")}>Enter their taste</button>
+            <button role="tab" aria-selected={mode === "custom"} className={mode === "custom" ? "on" : ""} onClick={() => setMode("custom")}>Enter their profile</button>
           </div>
           {mode === "demo" ? (
-            <div className="people pickable">
-              {cast.map((p) => (
-                <button key={p.id} className={`person ${pickId === p.id ? "picked" : ""}`} onClick={() => setPickId(p.id)} aria-pressed={pickId === p.id}>
-                  <b>{p.name}</b>
-                  <small>{p.age} · {p.work}</small>
-                  <span className="favs small">{p.favourites.map((f) => <Fav key={f.id} e={f} />)}</span>
-                </button>
-              ))}
-              {!cast.length && <p className="meta">Loading the demo twins from Qloo…</p>}
-            </div>
+            <>
+              <div className="people pickable">
+                {cast.map((p) => (
+                  <button key={p.id} className={`person ${pickId === p.id ? "picked" : ""}`} onClick={() => setPickId(p.id)} aria-pressed={pickId === p.id}>
+                    <b>{p.name}</b>
+                    <small>{p.age} · {p.work}</small>
+                    <small className="prefline">{prefsLine(p.prefs)}</small>
+                    <span className="favs small">{p.favourites.map((f) => <Fav key={f.id} e={f} />)}</span>
+                  </button>
+                ))}
+                {!cast.length && <p className="meta">Loading the demo twins from Qloo…</p>}
+              </div>
+              {picked && <p className="meta small">{picked.name}: {picked.about.join(" ")}</p>}
+            </>
           ) : (
-            <PersonForm title="" name={mName} setName={setMName} about={mAbout} setAbout={setMAbout} favs={mFavs} setFavs={setMFavs} placeholder={["Arjun", "I cook for my whole street. I want someone who laughs loudly."]} />
+            <PersonForm title="" whose="them" name={mName} setName={setMName} about={mAbout} setAbout={setMAbout} favs={mFavs} setFavs={setMFavs} prefs={mPrefs} setPrefs={setMPrefs} placeholder={["Arjun", "I cook for my whole street. I want someone who laughs loudly."]} />
           )}
           <div className="row gap">
             <label>
@@ -269,7 +377,7 @@ export default function Plan() {
             {you.name} &amp; {mname} · {city}
           </h2>
           <p className="meta small">
-            {runs.length} of {total} rehearsals done{baseline ? ` · plain café baseline: ${baseline.toFixed(0)}/100` : ""}
+            {runs.length} of {total} rehearsals done{base ? ` · plain café baseline: ${baseline.toFixed(0)}/100` : ""}
           </p>
           <div className="slots">
             {winners.map((w) => (
@@ -279,17 +387,17 @@ export default function Plan() {
                 </h3>
                 {w.opts.map((c) => {
                   const g = gain(c.id);
-                  const rs = of(c.id);
+                  const r = of(c.id);
                   const won = stage === "done" && w.best?.id === c.id;
                   return (
                     <div key={c.id} className={`cand ${won ? "won" : ""}`}>
                       <b>{c.name}</b>
                       <small>{c.kinds.filter((k) => k !== "Place").slice(0, 2).join(" · ")}</small>
+                      {c.fits.length > 0 && <small className="fit">✓ {c.fits.slice(0, 2).join(" · ")}</small>}
                       <div className="runs">
-                        {Array.from({ length: RUNS }, (_, i) => (
-                          <span key={i} className={`dot ${rs[i] ? (score(rs[i]) - baseline >= 0 ? "up" : "down") : "wait"}`} title={rs[i] ? `rehearsal ${i + 1}: ${score(rs[i]).toFixed(0)}/100` : "rehearsing…"} />
-                        ))}
-                        {g !== null && rs.length === RUNS && <span className={`gain ${g >= 0 ? "up" : "down"}`}>{g >= 0 ? "+" : ""}{g.toFixed(1)}</span>}
+                        <span className={`dot ${r ? (g !== null && g >= 0 ? "up" : "down") : "wait"}`} title={r ? `${score(r).toFixed(0)}/100` : "rehearsing…"} />
+                        {r && <small>{r.moments.length} proof moment{r.moments.length === 1 ? "" : "s"}</small>}
+                        {g !== null && <span className={`gain ${g >= 0 ? "up" : "down"}`}>{g >= 0 ? "+" : ""}{g.toFixed(1)}</span>}
                       </div>
                     </div>
                   );
@@ -303,49 +411,59 @@ export default function Plan() {
       {stage === "done" && (
         <section className="card day" ref={planRef}>
           <h2>Your first date with {mname}</h2>
-          <p className="meta">Each stop is the place where your twins&apos; wish for a second date rose most, compared with the same two of you at a plain café.</p>
+          <p className="meta">Each stop is the place where your twins&apos; wish for a second date rose most compared with the same two of you at a plain café, with the moments from the rehearsal that explain why.</p>
           <ol className="timeline">
             {winners.filter((w) => w.best).map((w) => {
-              const rs = of(w.best!.id);
-              const top = [...rs].sort((a, b) => score(b) - score(a))[0];
-              const order = [...new Set(rs.flatMap((r) => r.order))].slice(0, 3);
-              const g = gain(w.best!.id) ?? 0;
+              const c = w.best!;
+              const r = of(c.id);
+              const g = gain(c.id) ?? 0;
+              const ups = r?.moments.filter((m) => m.effect > 0).sort((x, y) => x.line - y.line) ?? [];
+              const downs = r?.moments.filter((m) => m.effect < 0).sort((x, y) => x.line - y.line) ?? [];
+              const tryThis = r?.order.length ? r.order : c.menu.slice(0, 3);
               return (
                 <li key={w.slot}>
                   <span className="when">{w.time}</span>
                   <div>
                     <h3>
-                      {w.icon} {w.best!.name}
+                      {w.icon} {c.name}
                       <span className={`gain ${g >= 0 ? "up" : "down"}`}>{g >= 0 ? "+" : ""}{g.toFixed(1)} vs café</span>
                     </h3>
-                    {w.best!.address && <small className="addr">{w.best!.address} · <a href={maps(w.best!, city)} target="_blank" rel="noreferrer">Map ↗</a></small>}
-                    {top?.spark && <p className="spark">“{top.spark}”</p>}
-                    {order.length > 0 && <p className="try-this"><span>Try:</span> {order.join(" · ")}</p>}
-                    <button className="link" onClick={() => setOpen(open === w.slot ? null : w.slot)}>
-                      {open === w.slot ? "Hide the rehearsal" : "Read the rehearsal"}
-                    </button>
-                    {open === w.slot && top && (
-                      <ul className="chat">
-                        {top.lines.map((l, i) => (
-                          <li key={i} className={l.who === "a" ? "you" : "them"}>
-                            <small>{l.who === "a" ? you.name : mname}</small>
-                            {l.say}
-                          </li>
-                        ))}
-                      </ul>
+                    {c.address && <small className="addr">{c.address} · <a href={maps(c, city)} target="_blank" rel="noreferrer">Map ↗</a></small>}
+                    {(c.fits.length > 0 || c.links.length > 0) && (
+                      <p className="why-qloo">
+                        <span>Why Qloo suggested it:</span> {[...c.fits, ...c.links.map((l) => `echoes your taste: ${l}`)].join(" · ")}
+                      </p>
                     )}
+                    {ups.length > 0 && (
+                      <>
+                        <p className="label">Why it worked for you two</p>
+                        <ul className="proofs">{ups.map((m, i) => <Proof key={i} m={m} r={r!} names={names} />)}</ul>
+                      </>
+                    )}
+                    {downs.length > 0 && (
+                      <>
+                        <p className="label">Watch out</p>
+                        <ul className="proofs">{downs.map((m, i) => <Proof key={i} m={m} r={r!} names={names} />)}</ul>
+                      </>
+                    )}
+                    {tryThis.length > 0 && <p className="try-this"><span>Try:</span> {tryThis.join(" · ")}</p>}
+                    <button className="link" onClick={() => setOpen(open === w.slot ? null : w.slot)}>
+                      {open === w.slot ? "Hide the rehearsal" : "Read the whole rehearsal"}
+                    </button>
+                    {open === w.slot && r && <Transcript r={r} names={names} />}
                   </div>
                 </li>
               );
             })}
           </ol>
           <div className="talk">
-            <p><span>💬 Talk about:</span> {tally("landed", winIds).join(" · ") || "—"}</p>
-            <p><span>🙊 Maybe skip:</span> {tally("flat", winIds).join(" · ") || "—"}</p>
+            <p><span>💬 What lifted you both:</span> {across(1).join(" · ") || "—"}</p>
+            <p><span>🙊 Be careful with:</span> {across(-1).join(" · ") || "—"}</p>
           </div>
           <p className="meta small">
-            Places, menus and the taste behind them come from Qloo&apos;s taste graph for both of you together. The twins rehearsed each
-            stop {RUNS} times (GLM-5.3); rehearsals vary, so treat small differences as a coin toss.
+            Places, menus, food tags and the taste behind them come from Qloo for both of you together. Each moment is checked: it must quote
+            a real line, a real item from that person&apos;s profile, and a real Qloo feature of the place. One rehearsal per place (GLM-5.3):
+            a guide to a good day, not a guarantee.
           </p>
           <button className="go ghost" onClick={() => { setStage("input"); setRuns([]); setCands([]); }}>Plan another day</button>
         </section>
@@ -354,57 +472,37 @@ export default function Plan() {
       {stage === "done" && (
         <section className="card all">
           <h2>All {runs.length} rehearsals</h2>
-          <p className="meta small">Every place Qloo suggested, and the plain café your twins also rehearsed at for comparison. Scores are how much each twin wants a second date afterwards (0-100). Click a row to read both rehearsals.</p>
+          <p className="meta small">Every place Qloo suggested, and the plain café your twins also rehearsed at for comparison. Scores are how much each twin wants a second date afterwards (0-100). Click a row to read the rehearsal, with the proof moments highlighted.</p>
           <div className="table-wrap">
             <table className="rehearsals">
               <thead>
                 <tr>
-                  <th>Slot</th><th>Place</th>
-                  {Array.from({ length: RUNS }, (_, i) => <th key={i}>Run {i + 1}<small>{you.name} / {mname}</small></th>)}
-                  <th>Average</th><th>vs café</th><th>Sparking line</th>
+                  <th>Slot</th><th>Place</th><th>Score<small>{you.name} / {mname}</small></th><th>vs café</th><th>Proof</th><th>Strongest moment</th>
                 </tr>
               </thead>
               <tbody>
                 {[{ id: "cafe", slot: null as Slot | null, name: "Plain café (baseline)", kinds: [] as string[] }, ...cands].map((c) => {
-                  const rs = runs.filter((r) => (c.id === "cafe" ? r.venue === null : r.venue === c.id)).sort((a, b) => a.run - b.run);
-                  const avg = mean(rs.map(score));
-                  const g = c.id === "cafe" ? null : avg - baseline;
+                  const r = c.id === "cafe" ? base : of(c.id);
+                  const g = c.id === "cafe" ? null : gain(c.id);
                   const slot = SLOTS.find((s) => s.slot === c.slot);
                   const won = winIds.includes(c.id);
-                  const best = [...rs].sort((a, b) => score(b) - score(a))[0];
+                  const top = r?.moments.find((m) => m.effect > 0) ?? r?.moments[0];
+                  const ups = r?.moments.filter((m) => m.effect > 0).length ?? 0;
+                  const downs = (r?.moments.length ?? 0) - ups;
                   return (
                     <Fragment key={c.id}>
                       <tr className={`${won ? "won" : ""} ${c.id === "cafe" ? "base" : ""} ${row === c.id ? "open" : ""}`} onClick={() => setRow(row === c.id ? null : c.id)} tabIndex={0} onKeyDown={(e) => e.key === "Enter" && setRow(row === c.id ? null : c.id)} aria-expanded={row === c.id}>
                         <td>{slot ? `${slot.icon} ${slot.label}` : "—"}</td>
                         <td><b>{c.name}</b>{won && <span className="pill">in your plan</span>}<small>{c.kinds.filter((k) => k !== "Place").slice(0, 2).join(" · ")}</small></td>
-                        {Array.from({ length: RUNS }, (_, i) => (
-                          <td key={i} className={`num ${rs[i] && g !== null && score(rs[i]) < baseline ? "down" : ""}`}>{rs[i] ? `${rs[i].aAfter} / ${rs[i].bAfter}` : "…"}</td>
-                        ))}
-                        <td className="num">{rs.length ? avg.toFixed(1) : "…"}</td>
+                        <td className="num">{r ? `${r.aAfter} / ${r.bAfter}` : "…"}</td>
                         <td className={`num ${g === null ? "" : g >= 0 ? "up" : "down"}`}>{g === null ? "—" : `${g >= 0 ? "+" : ""}${g.toFixed(1)}`}</td>
-                        <td className="quote">{best?.spark ? `“${best.spark}”` : "—"}</td>
+                        <td className="num">{r ? <><span className="up">▲{ups}</span> <span className="down">▼{downs}</span></> : "…"}</td>
+                        <td className="quote">{top && r ? <>“{r.lines[top.line]?.say}”<small>{top.because} × {top.feature.replace(/^menu: /, "")}</small></> : "—"}</td>
                       </tr>
-                      {row === c.id && (
+                      {row === c.id && r && (
                         <tr className="detail">
-                          <td colSpan={5 + RUNS}>
-                            <div className="pair">
-                              {rs.map((r) => (
-                                <div key={r.run}>
-                                  <h4>Run {r.run} · {you.name} {r.aAfter} / {mname} {r.bAfter}</h4>
-                                  <ul className="chat">
-                                    {r.lines.map((l, i) => (
-                                      <li key={i} className={l.who === "a" ? "you" : "them"}>
-                                        <small>{l.who === "a" ? you.name : mname}</small>
-                                        {l.say}
-                                      </li>
-                                    ))}
-                                  </ul>
-                                  {r.order.length > 0 && <p className="small"><span className="meta">Ordered:</span> {r.order.join(" · ")}</p>}
-                                  {r.landed.length > 0 && <p className="small"><span className="meta">Went well:</span> {r.landed.join(" · ")}</p>}
-                                  {r.flat.length > 0 && <p className="small"><span className="meta">Fell flat:</span> {r.flat.join(" · ")}</p>}
-                                </div>
-                              ))}
-                            </div>
+                          <td colSpan={6}>
+                            <Transcript r={r} names={names} />
                           </td>
                         </tr>
                       )}

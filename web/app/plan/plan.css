@@ -54,3 +54,28 @@
 .rehearsals .pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
 .rehearsals .pair h4 { margin: 4px 0; font-size: 13px; }
 .rehearsals .pair .chat li { max-width: 92%; font-size: 13px; }
+
+.prefs { display: grid; gap: 8px; margin: 14px 0 4px; }
+.prefs .q { display: grid; grid-template-columns: 150px 1fr; gap: 8px; align-items: center; }
+.prefs .q > span { font-size: 14px; color: var(--muted); }
+.prefs .q > div { display: flex; flex-wrap: wrap; gap: 6px; }
+@media (max-width: 560px) { .prefs .q { grid-template-columns: 1fr; } }
+.chip { font: inherit; font-size: 13px; border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: 999px; padding: 4px 12px; cursor: pointer; }
+.chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.person .prefline { margin-top: 2px; font-size: 11px; }
+.cand .fit { color: var(--accent); margin-top: 3px; }
+.runs small { color: var(--muted); font-size: 11px; }
+.day .why-qloo { font-size: 13px; margin: 4px 0; }
+.day .why-qloo span, .day .label { color: var(--muted); }
+.day .label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; margin: 10px 0 4px; font-weight: 700; }
+.proofs { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+.proofs li { border-radius: 10px; padding: 8px 12px; background: var(--diary); border-left: 4px solid var(--accent); }
+.proofs li.down { border-left-color: #d1495b; background: var(--hot); }
+.proofs q { font-style: italic; display: block; }
+.proofs small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+.chat li.proof { outline: 2px solid var(--accent); }
+.chat li.proof.down { outline-color: #d1495b; }
+.rehearsals .up { color: var(--accent); font-weight: 700; }
+.rehearsals .down { color: #d1495b; }
+.rehearsals .quote small { font-style: normal; }
+.rehearsals tr.detail .chat li { max-width: 80%; font-size: 13px; }

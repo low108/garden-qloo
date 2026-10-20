@@ -1,8 +1,9 @@
 # Rehearse your first date · The Garden, with taste (Qloo Agentic Hackathon)
 
 You matched. Now your AI twins rehearse a whole day together, at real places Qloo's taste graph picks for both
-of you, a few times over, and you get the day that brought them closest: where to go, what to order, what to
-talk about.
+of you, and you get the day that brought them closest, with proof: the lines from the rehearsal where something
+about one of you (an introvert, a Spirited Away fan, halal only) met something about the place (quiet, Japanese,
+Qloo-tagged halal), and the minute it happened.
 
 - **Live demo:** https://garden-qloo.vercel.app (plan a day: about a minute)
 
@@ -12,10 +13,12 @@ talk about.
 |---|---|
 | Two real tastes | `/search`: you (and your match) pick real films, artists, shows and books; each twin loves those entities |
 | The day's candidates | `/v2/insights` with `filter.type=urn:entity:place`, both people's entities as the signal, `filter.location.query`=your city, and `filter.tags` per slot (cafe/brunch/bakery, museum/gallery/park, restaurant, cocktail/wine bar) |
+| Fit to the two people | Qloo's typed tags: `dietary_option` (halal, vegetarian, vegan) via `operator.filter.tags=intersection`, `price_level` against the budget, `noise_level`/`ambience` against introvert/extravert, place kinds for side-by-side dates; bars swapped for dessert/tea/night markets if one doesn't drink |
+| Proof | each place's Qloo features are numbered (F1…); every moment the twins report must cite a real line, a real profile item and a real feature, or it is dropped |
 | What to order | each place's `menu_highlight` tags: the twins may only order those |
 | The demo twins | `/search` resolves each fictional twin's stated favourites to real entities |
 
-The twins (GLM-5.3 on ILMU, ILMU-mini as fallback) rehearse every candidate twice and a plain cafe twice as a
+The twins (GLM-5.3 on ILMU, ILMU-mini as fallback) rehearse every candidate once and a plain cafe once as a
 baseline; each place is scored by how much more both want a second date than at the cafe. Qloo responses are
 cached privately on the server and never committed.
 
