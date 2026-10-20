@@ -121,13 +121,14 @@ function PersonForm(p: {
   about: string; setAbout: (s: string) => void;
   favs: Entity[]; setFavs: (f: Entity[]) => void;
   placeholder: [string, string];
+  whose?: string;
 }) {
   return (
     <>
       <h3>{p.title}</h3>
       <div className="row">
         <label>Name<input value={p.name} onChange={(e) => p.setName(e.target.value)} maxLength={40} placeholder={p.placeholder[0]} /></label>
-        <label className="grow">Two things about them<input value={p.about} onChange={(e) => p.setAbout(e.target.value)} maxLength={300} placeholder={p.placeholder[1]} /></label>
+        <label className="grow">Two things about {p.whose ?? "them"}<input value={p.about} onChange={(e) => p.setAbout(e.target.value)} maxLength={300} placeholder={p.placeholder[1]} /></label>
       </div>
       <p className="meta small">At least 3 favourites: films, music, TV or books.</p>
       <Picker picked={p.favs} onPick={(e) => p.setFavs(p.favs.length < 8 ? [...p.favs, e] : p.favs)} />
@@ -228,7 +229,7 @@ export default function Plan() {
 
       {stage === "input" && (
         <section className="card">
-          <PersonForm title="1 · You" name={name} setName={setName} about={about} setAbout={setAbout} favs={favs} setFavs={setFavs} placeholder={["Mira", "I collect vinyl. I want someone who cooks with me."]} />
+          <PersonForm title="1 · You" name={name} setName={setName} about={about} setAbout={setAbout} favs={favs} setFavs={setFavs} whose="you" placeholder={["Mira", "I collect vinyl. I want someone who cooks with me."]} />
           <h3 className="gap">2 · Your match</h3>
           <div className="tabs mode" role="tablist">
             <button role="tab" aria-selected={mode === "demo"} className={mode === "demo" ? "on" : ""} onClick={() => setMode("demo")}>Pick a demo twin</button>
