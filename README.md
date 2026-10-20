@@ -33,7 +33,7 @@ product helps a couple who already matched have a good first day instead.
 ```bash
 cd web && npm install
 printf "QLOO_API_KEY=...\nILMU_API_KEY=...\n" > .env.local   # Qloo hackathon key, ILMU key
-npm run dev                                                    # http://localhost:3000/try
+npm run dev                                                    # http://localhost:3000/plan
 ```
 
 Deploy: `scripts/deploy_vercel.sh`. Benchmark (needs the Kaggle speed-dating CSV in `data/raw/`):

@@ -25,7 +25,9 @@ const DIET_TAG: Partial<Record<Prefs["diet"][number], string>> = {
 };
 const PER_SLOT = 2;
 // Not first-date places: hotels, places of worship, youth and community centres, shops, corporate clubs.
-const NOT_A_DATE = /hotel|resort|temple|church|mosque|dargah|shrine|cathedral|school|kids|child|youth|community|hospital|store\b|club ?house|members|corporate|office|canteen|cafeteria|food court|supermarket/i;
+const NOT_A_DATE = /hotel|resort|temple|church|mosque|dargah|shrine|cathedral|school|kids|child|youth|community|hospital|store\b|club ?house|members|corporate|office|canteen|cafeteria|food court|supermarket|coworking/i;
+// A street address or a whole neighbourhood rather than one place you can book ("10 Winstedt Road", "Dempsey Hill").
+const AREA = /^\d+[a-z]? [\w ]+ (road|rd|street|st|avenue|ave|lane)$|^[\w ]+ (hill|village|quarter|district|precinct)$/i;
 const QUIET = /quiet|cozy|calm|tranquil|relax|peaceful|intimate|serene/i;
 const LOUD = /lively|loud|party|club|nightlife|energetic|bustling|crowded|vibrant/i;
 const SIDE_BY_SIDE = /museum|gallery|park|garden|market|book|board game|arcade|live music|concert|walk|nature/i;
@@ -92,9 +94,11 @@ export async function candidates(a: Person, b: Person, city: string): Promise<Ca
     const ok = pool
       .map((p, rank) => ({ p, rank, f: fit(p, [a, b]) }))
       .filter(({ p }) => !used.has(p.id) && !p.flags.length && !NOT_A_DATE.test([p.name, ...p.kinds].join(" ")))
+      .filter(({ p }) => !(food && AREA.test(p.name.trim())))
       .filter(({ p }) => !p.price || p.price <= budget)
       .filter(({ p }) => !(sober && /bar$|pub|cocktail|wine|brewery/i.test(p.kinds.join(" "))))
-      .sort((x, y) => y.f.score - x.f.score || x.rank - y.rank);
+      // For a meal, a place with Qloo menu highlights gives the twins something real to order.
+      .sort((x, y) => y.f.score + (food && y.p.menu.length ? 0.5 : 0) - x.f.score - (food && x.p.menu.length ? 0.5 : 0) || x.rank - y.rank);
     for (const { p, f } of ok.slice(0, PER_SLOT)) {
       used.add(p.id);
       const rules = [
