@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import type { Person } from "@/lib/server/garden";
 import type { Candidate, Rehearsal, Slot } from "@/lib/server/planner";
 import type { Entity, EntityType } from "@/lib/server/qloo";
@@ -159,6 +159,7 @@ export default function Plan() {
   const [status, setStatus] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
+  const [row, setRow] = useState<string | null>(null); // the place whose rehearsals are open in the table
   const planRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -346,6 +347,72 @@ export default function Plan() {
             stop {RUNS} times (GLM-5.3); rehearsals vary, so treat small differences as a coin toss.
           </p>
           <button className="go ghost" onClick={() => { setStage("input"); setRuns([]); setCands([]); }}>Plan another day</button>
+        </section>
+      )}
+
+      {stage === "done" && (
+        <section className="card all">
+          <h2>All {runs.length} rehearsals</h2>
+          <p className="meta small">Every place Qloo suggested, and the plain café your twins also rehearsed at for comparison. Scores are how much each twin wants a second date afterwards (0-100). Click a row to read both rehearsals.</p>
+          <div className="table-wrap">
+            <table className="rehearsals">
+              <thead>
+                <tr>
+                  <th>Slot</th><th>Place</th>
+                  {Array.from({ length: RUNS }, (_, i) => <th key={i}>Run {i + 1}<small>{you.name} / {mname}</small></th>)}
+                  <th>Average</th><th>vs café</th><th>Sparking line</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[{ id: "cafe", slot: null as Slot | null, name: "Plain café (baseline)", kinds: [] as string[] }, ...cands].map((c) => {
+                  const rs = runs.filter((r) => (c.id === "cafe" ? r.venue === null : r.venue === c.id)).sort((a, b) => a.run - b.run);
+                  const avg = mean(rs.map(score));
+                  const g = c.id === "cafe" ? null : avg - baseline;
+                  const slot = SLOTS.find((s) => s.slot === c.slot);
+                  const won = winIds.includes(c.id);
+                  const best = [...rs].sort((a, b) => score(b) - score(a))[0];
+                  return (
+                    <Fragment key={c.id}>
+                      <tr className={`${won ? "won" : ""} ${c.id === "cafe" ? "base" : ""} ${row === c.id ? "open" : ""}`} onClick={() => setRow(row === c.id ? null : c.id)} tabIndex={0} onKeyDown={(e) => e.key === "Enter" && setRow(row === c.id ? null : c.id)} aria-expanded={row === c.id}>
+                        <td>{slot ? `${slot.icon} ${slot.label}` : "—"}</td>
+                        <td><b>{c.name}</b>{won && <span className="pill">in your plan</span>}<small>{c.kinds.filter((k) => k !== "Place").slice(0, 2).join(" · ")}</small></td>
+                        {Array.from({ length: RUNS }, (_, i) => (
+                          <td key={i} className={`num ${rs[i] && g !== null && score(rs[i]) < baseline ? "down" : ""}`}>{rs[i] ? `${rs[i].aAfter} / ${rs[i].bAfter}` : "…"}</td>
+                        ))}
+                        <td className="num">{rs.length ? avg.toFixed(1) : "…"}</td>
+                        <td className={`num ${g === null ? "" : g >= 0 ? "up" : "down"}`}>{g === null ? "—" : `${g >= 0 ? "+" : ""}${g.toFixed(1)}`}</td>
+                        <td className="quote">{best?.spark ? `“${best.spark}”` : "—"}</td>
+                      </tr>
+                      {row === c.id && (
+                        <tr className="detail">
+                          <td colSpan={5 + RUNS}>
+                            <div className="pair">
+                              {rs.map((r) => (
+                                <div key={r.run}>
+                                  <h4>Run {r.run} · {you.name} {r.aAfter} / {mname} {r.bAfter}</h4>
+                                  <ul className="chat">
+                                    {r.lines.map((l, i) => (
+                                      <li key={i} className={l.who === "a" ? "you" : "them"}>
+                                        <small>{l.who === "a" ? you.name : mname}</small>
+                                        {l.say}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                  {r.order.length > 0 && <p className="small"><span className="meta">Ordered:</span> {r.order.join(" · ")}</p>}
+                                  {r.landed.length > 0 && <p className="small"><span className="meta">Went well:</span> {r.landed.join(" · ")}</p>}
+                                  {r.flat.length > 0 && <p className="small"><span className="meta">Fell flat:</span> {r.flat.join(" · ")}</p>}
+                                </div>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </section>
       )}
 
