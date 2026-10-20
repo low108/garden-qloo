@@ -43,3 +43,7 @@ data/models/
 # Qloo responses and results: cache privately, never publish (Qloo hackathon rules)
 data/qloo_cache/
 data/qloo_*.json
+
+# Vercel project link
+web/.vercel
+.vercel

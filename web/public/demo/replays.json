@@ -1,0 +1,1 @@
+[{"sim_id": "ddd60e575909", "run_id": "r00", "model": "ilmu:ilmu-glm-5.3-flash|ilmu:ilmu-mini-v3.3", "seed": 8, "scenario": null, "featured": true, "outcome": "breakout", "day": 27, "pair": ["Lina", "Tomas"], "created_at": "2026-10-13T09:03:28.811327+00:00"}]

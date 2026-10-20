@@ -1,3 +1,41 @@
+# The Garden, with taste · Qloo Agentic Hackathon
+
+**Don't match tastes. Simulate them.** Your AI twin goes on the first dates for you, in a world built from
+Qloo's taste graph, and you meet the one it would run away with.
+
+- **Live demo:** https://garden-qloo.vercel.app (try it: about a minute)
+- **Why simulate:** on 4,089 real speed dates, Qloo taste overlap predicted mutual matches no better than chance
+  (AUC 0.48); see `/experiment` and `scripts/qloo_benchmark.py`.
+
+## How Qloo powers it
+
+| Step | Qloo |
+|---|---|
+| Your taste | `/search`: pick real films, artists, shows and books; your twin loves those entities |
+| The demo twins | `/search` resolves each twin's stated favourites to real entities |
+| Every date's venue | `/v2/insights` (`filter.type=urn:entity:place`, both twins' entities, `filter.location.query`=your city), filtered to date spots by typed `genre`/`category` tags |
+| Common ground on the date | `/v2/insights` for films and artists seeded by both twins, minus what they listed |
+| The taste-score baseline | `/v2/insights` across films, music, TV and books per person; weighted Jaccard of affinities |
+| Your first-date plan | the same place insights in your city, plus common ground to talk about |
+
+Twins are voiced by GLM-5.3 on ILMU (ILMU-mini as fallback). Qloo responses are cached privately on the server
+(Next.js data cache, `data/qloo_cache/` for the benchmark) and never committed.
+
+## Run it
+
+```bash
+cd web && npm install
+printf "QLOO_API_KEY=...\nILMU_API_KEY=...\n" > .env.local   # Qloo hackathon key, ILMU key
+npm run dev                                                    # http://localhost:3000/try
+```
+
+Deploy: `scripts/deploy_vercel.sh`. Benchmark (needs the Kaggle speed-dating CSV in `data/raw/`):
+`uv run python scripts/qloo_benchmark.py`.
+
+Built on The Garden (a Concordia agent simulation of AI dating twins); the original project's README follows.
+
+---
+
 # dj_is_hung
 
 Breakout Matching prototype, inspired by Black Mirror's "Hang the DJ". AI twins live in a simulated Garden; a pair is a match only when both twins choose to cross the wall together. The full plan is in the spec issue (#1).
