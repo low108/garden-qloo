@@ -48,3 +48,4 @@ data/qloo_*.json
 web/.vercel
 .vercel
 data/qloo_sim/
+!web/.env.example
